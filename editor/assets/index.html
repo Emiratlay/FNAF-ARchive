@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>FNAF AR Editor</title>
+<style>
+  :root {
+    --bg: #0d0d0f; --panel: #17171b; --panel2: #202026; --line: #2c2c34;
+    --text: #ececf1; --muted: #9a9aa6; --accent: #e8a33c; --danger: #e05555; --ok: #4fbf7a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 14px 16px 10px; background: linear-gradient(#1b1310, var(--bg)); border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 19px; letter-spacing: .5px; }
+  header h1 span { color: var(--accent); }
+  #status { color: var(--muted); font-size: 12px; margin-top: 3px; word-break: break-all; }
+  nav { display: flex; position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+  nav button { flex: 1; padding: 12px 4px; background: none; border: 0; color: var(--muted); font-size: 14px; border-bottom: 2px solid transparent; }
+  nav button.on { color: var(--accent); border-bottom-color: var(--accent); }
+  main { padding: 12px 16px 90px; }
+  .warn { background: #2a1f10; border: 1px solid #5a4317; color: #f1d39e; border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; }
+  .err { background: #2a1214; border: 1px solid #6a2a2f; color: #f5b5b9; border-radius: 10px; padding: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .grow { flex: 1; min-width: 0; }
+  .name { font-weight: 600; }
+  .sub { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--panel2); color: var(--accent); margin-left: 6px; vertical-align: 1px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  input, select, textarea { width: 100%; padding: 10px 11px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); font-size: 15px; }
+  textarea { min-height: 64px; resize: vertical; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  button.btn { padding: 11px 14px; border-radius: 10px; border: 0; background: var(--accent); color: #1a1205; font-weight: 700; font-size: 15px; }
+  button.btn.ghost { background: var(--panel2); color: var(--text); border: 1px solid var(--line); font-weight: 600; }
+  button.btn.danger { background: var(--danger); color: #fff; }
+  button.btn.full { width: 100%; }
+  .stepper { display: flex; align-items: center; gap: 6px; }
+  .stepper button { width: 36px; height: 36px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); font-size: 20px; line-height: 1; }
+  .stepper span { min-width: 26px; text-align: center; font-weight: 700; }
+  .switch { position: relative; width: 50px; height: 28px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch i { position: absolute; inset: 0; background: var(--panel2); border: 1px solid var(--line); border-radius: 99px; transition: .2s; }
+  .switch i:before { content: ""; position: absolute; width: 22px; height: 22px; left: 2px; top: 2px; background: var(--muted); border-radius: 50%; transition: .2s; }
+  .switch input:checked + i { background: #3b2a10; border-color: var(--accent); }
+  .switch input:checked + i:before { transform: translateX(22px); background: var(--accent); }
+  .savebar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px 14px; background: rgba(13,13,15,.96); border-top: 1px solid var(--line); display: none; }
+  .savebar.show { display: block; }
+  .grid3 { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .money input { font-size: 22px; font-weight: 700; }
+  .quick { display: flex; gap: 8px; margin-top: 8px; }
+  .quick button { flex: 1; }
+  h2 { font-size: 16px; margin: 18px 0 8px; }
+  .toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); background: #222; border: 1px solid var(--line); padding: 10px 16px; border-radius: 99px; font-size: 14px; opacity: 0; transition: .25s; pointer-events: none; max-width: 90%; text-align: center; }
+  .toast.show { opacity: 1; }
+  .toast.ok { border-color: var(--ok); }
+  .toast.bad { border-color: var(--danger); }
+  .stars { color: var(--accent); letter-spacing: 1px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>FNAF AR <span>Editor</span></h1>
+  <div id="status">Loading…</div>
+</header>
+<nav id="tabs">
+  <button data-tab="money" class="on">Money</button>
+  <button data-tab="mods">Mod Chips</button>
+  <button data-tab="skins">Skins</button>
+  <button data-tab="custom">Custom</button>
+</nav>
+<main id="main"></main>
+<div class="savebar" id="savebar"><button class="btn full" id="saveBtn">Save changes</button></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+// ------------------------------------------------------------------ file access
+var MD = "cdn/8.0.0/Masterdata/800/";
+var STATE = "save/state.json";
+var CUSTOM = "custom/custom.json";
+var LANGS = ["English", "French", "Italian", "German", "Spanish_Spain", "Portuguese_Brazil", "Russian"];
+
+function readJson(rel) {
+  var t = window.Android ? Android.read(rel) : null;
+  if (t === null || t === undefined) return null;
+  return JSON.parse(t);
+}
+function writeJson(rel, obj) {
+  var err = Android.write(rel, JSON.stringify(obj, null, 1));
+  if (err) throw new Error(err);
+}
+
+// ------------------------------------------------------------------ labels
+var CAT_TR = {
+  AttackPhase: "Attack", Disruption: "Disruption", Haywire: "Haywire",
+  CommonSalvage: "Common salvage", RareSalvage: "Rare salvage", SalvageTime: "Salvage time",
+  WearAndTear: "Wear and tear", Stalking: "Stalking", Map: "Map", Static: "Static"
+};
+var EFFECT_TR = {
+  CircleSpeed: "Circling speed", WearAndTearChance: "Wear and tear chance",
+  ChanceToDisrupt: "Chance to disrupt", CancelDuration: "Disruption duration",
+  HaywireCircleActivation: "Haywire while circling", HaywirePauseActivation: "Haywire while paused",
+  HaywireLookTimer: "Haywire look timer", CommonRewardChance: "Common reward chance",
+  PartsMin: "Minimum parts", PartsMax: "Maximum parts", RareRewardChance: "Rare reward chance",
+  PlushSuitChance: "Plush suit chance", ScavengingPeriod: "Scavenging period",
+  WearAndTearDamageMin: "Minimum wear damage", WearAndTearDamageMax: "Maximum wear damage",
+  StalkingTimeMin: "Minimum stalking time", StalkingTimeMax: "Maximum stalking time",
+  NodeTravelTimeMin: "Minimum map travel time", NodeTravelTimeMax: "Maximum map travel time",
+  Shear: "Static strength"
+};
+function catName(c) { return CAT_TR[c] || c; }
+function effName(t) { return EFFECT_TR[t] || t; }
+
+// ------------------------------------------------------------------ data
+var D = {};   // base: mods, cats, suits, loc
+var state = null, custom = null;
+var dirtyState = false, dirtyCustom = false, dirtyWorld = false;
+
+function emptyCustom() { return { version: 0, mods: [], plushsuits: [], cpus: [], loc: [], meta: {} }; }
+
+function load() {
+  if (!window.Android) { fail("This page only works inside the FNAF AR Editor app."); return false; }
+  if (!Android.hasPermission()) { fail("Storage permission was not granted. Enable it in Settings → Apps → FNAF AR Editor → Permissions."); return false; }
+  state = readJson(STATE);
+  if (!state) {
+    fail("Player save not found:<br><b>" + Android.basePath() + "/" + STATE + "</b><br><br>" +
+         "The FNAFAR_server folder must be in the phone's internal storage, and the server must have been started and the game opened at least once.");
+    return false;
+  }
+  custom = readJson(CUSTOM) || emptyCustom();
+  ["mods", "plushsuits", "cpus", "loc"].forEach(function (k) { if (!custom[k]) custom[k] = []; });
+  if (!custom.meta) custom.meta = {};
+  if (typeof custom.version !== "number") custom.version = 0;
+
+  var mods = readJson(MD + "MODS_DATA"), suits = readJson(MD + "PLUSHSUIT_DATA"), loc = readJson(MD + "LOC_DATA");
+  if (!mods || !suits || !loc) { fail("Could not read game data (" + Android.basePath() + "/" + MD + ")."); return false; }
+  D.mods = mods.Entries; D.suits = suits.Entries;
+  D.loc = {};
+  loc.Entries.forEach(function (e) { D.loc[e.ID] = e.English; });
+
+  // category -> effect types (with the in-game range) and icon set
+  D.cats = {};
+  D.mods.forEach(function (m) {
+    var ef = m.Effects || {}, c = ef.EffectCategory;
+    if (!D.cats[c]) D.cats[c] = { types: {}, art: m.ArtAssets };
+    for (var i = 1; i <= 3; i++) {
+      var t = ef["EffectType_" + i], v = ef["EffectMag_" + i];
+      if (!t) continue;
+      var r = D.cats[c].types[t] || (D.cats[c].types[t] = { min: v, max: v });
+      r.min = Math.min(r.min, v); r.max = Math.max(r.max, v);
+    }
+  });
+  if (!state.Currency) state.Currency = { PARTS: 0, ESSENCE: 0, FAZ_TOKENS: 0 };
+  if (!state.ModInventory) state.ModInventory = {};
+  if (!state.Inventory) state.Inventory = {};
+
+  document.getElementById("status").textContent =
+    "Save: " + Android.basePath() + " · custom content version " + custom.version;
+  return true;
+}
+
+function fail(html) {
+  document.getElementById("main").innerHTML = '<div class="err">' + html + "</div>";
+  document.getElementById("status").textContent = "Error";
+}
+
+function locText(key, fallback) {
+  for (var i = 0; i < custom.loc.length; i++) if (custom.loc[i].ID === key) return custom.loc[i].English;
+  return D.loc[key] || fallback || key;
+}
+function allMods() { return D.mods.concat(custom.mods); }
+function allSuits() { return D.suits.filter(function (s) { return s.SkinCategory; }).concat(custom.plushsuits); }
+function isCustom(id) { return !!custom.meta[id]; }
+
+// ------------------------------------------------------------------ helpers
+function el(tag, attrs, kids) {
+  var e = document.createElement(tag);
+  if (attrs) Object.keys(attrs).forEach(function (k) {
+    if (k === "text") e.textContent = attrs[k];
+    else if (k === "html") e.innerHTML = attrs[k];
+    else if (k.indexOf("on") === 0) e.addEventListener(k.slice(2), attrs[k]);
+    else e.setAttribute(k, attrs[k]);
+  });
+  (kids || []).forEach(function (c) { if (c) e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+  return e;
+}
+function toast(msg, kind) {
+  var t = document.getElementById("toast");
+  t.textContent = msg; t.className = "toast show " + (kind || "");
+  clearTimeout(toast._t); toast._t = setTimeout(function () { t.className = "toast"; }, 2600);
+}
+function markDirty(which) {
+  if (which === "custom") dirtyCustom = true; else dirtyState = true;
+  document.getElementById("savebar").className = "savebar show";
+}
+function stars(n) { var s = ""; for (var i = 0; i < 3; i++) s += i < n ? "★" : "☆"; return s; }
+function slug(name) {
+  var map = { "ç": "c", "ğ": "g", "ı": "i", "ö": "o", "ş": "s", "ü": "u", "Ç": "C", "Ğ": "G", "İ": "I", "Ö": "O", "Ş": "S", "Ü": "U" };
+  var s = name.replace(/[çğıöşüÇĞİÖŞÜ]/g, function (c) { return map[c]; }).replace(/[^A-Za-z0-9]/g, "");
+  return (s.slice(0, 20) || "Custom") + "_" + Date.now().toString(36);
+}
+function addLoc(id, text) {
+  var e = { ID: id };
+  LANGS.forEach(function (l) { e[l] = text; });
+  custom.loc.push(e);
+}
+function suitInv() { return { Auto: 0, Common: 0, ControlKeys: 0, PlushSuit: 1, Rare: 0, Uncommon: 0 }; }
+function bumpCustom() { custom.version += 1; markDirty("custom"); markDirty("state"); }
+
+// ------------------------------------------------------------------ Money
+function renderMoney(root) {
+  root.appendChild(el("div", { class: "warn", text: "Close the game before editing. After saving, open the game again; the new values load on startup." }));
+  var fields = [["PARTS", "Parts"], ["FAZ_TOKENS", "Faz-Coins"], ["ESSENCE", "Remnant"]];
+  var box = el("div", { class: "grid3" });
+  fields.forEach(function (f) {
+    var input = el("input", { type: "number", min: "0", inputmode: "numeric", value: String(state.Currency[f[0]] || 0) });
+    input.addEventListener("input", function () {
+      var v = parseInt(input.value, 10);
+      state.Currency[f[0]] = isNaN(v) || v < 0 ? 0 : Math.min(v, 2000000000);
+      markDirty("state");
+    });
+    var quick = el("div", { class: "quick" });
+    [100, 1000, 10000].forEach(function (n) {
+      quick.appendChild(el("button", { class: "btn ghost", text: "+" + n, onclick: function () {
+        input.value = (parseInt(input.value, 10) || 0) + n; input.dispatchEvent(new Event("input"));
+      } }));
+    });
+    box.appendChild(el("div", { class: "card money" }, [el("label", { text: f[1] }), input, quick]));
+  });
+  root.appendChild(box);
+}
+
+// ------------------------------------------------------------------ Mod chips
+function effectsText(m) {
+  var ef = m.Effects || {}, out = [];
+  for (var i = 1; i <= 3; i++) if (ef["EffectType_" + i]) out.push(effName(ef["EffectType_" + i]) + " ×" + ef["EffectMag_" + i]);
+  return out.join(" · ");
+}
+
+function renderMods(root) {
+  root.appendChild(el("button", { class: "btn full", text: "+ Create a new mod chip", onclick: function () { renderModForm(root); } }));
+  var q = el("input", { type: "search", placeholder: "Search…", style: "margin:12px 0" });
+  var list = el("div");
+  function draw() {
+    list.innerHTML = "";
+    var term = q.value.toLowerCase();
+    allMods().forEach(function (m) {
+      var id = m.ModLogical, nm = locText(m.ModName, id);
+      if (term && (nm + " " + id + " " + catName(m.Effects.EffectCategory)).toLowerCase().indexOf(term) < 0) return;
+      var count = el("span", { text: String(state.ModInventory[id] || 0) });
+      function set(n) {
+        if (n <= 0) delete state.ModInventory[id]; else state.ModInventory[id] = n;
+        count.textContent = String(n > 0 ? n : 0); markDirty("state");
+      }
+      list.appendChild(el("div", { class: "card row" }, [
+        el("div", { class: "grow" }, [
+          el("div", { class: "name" }, [nm, isCustom(id) ? el("span", { class: "tag", text: "custom" }) : null]),
+          el("div", { class: "sub" }, [el("span", { class: "stars", text: stars(m.Stars || 1) }), "  " + catName(m.Effects.EffectCategory)]),
+          el("div", { class: "sub", text: effectsText(m) })
+        ]),
+        el("div", { class: "stepper" }, [
+          el("button", { text: "−", onclick: function () { set((state.ModInventory[id] || 0) - 1); } }),
+          count,
+          el("button", { text: "+", onclick: function () { set((state.ModInventory[id] || 0) + 1); } })
+        ])
+      ]));
+    });
+  }
+  q.addEventListener("input", draw);
+  root.appendChild(q); root.appendChild(list); draw();
+}
+
+function renderModForm(root) {
+  root.innerHTML = "";
+  root.appendChild(el("button", { class: "btn ghost", text: "← Back", onclick: function () { show("mods"); } }));
+  root.appendChild(el("h2", { text: "New mod chip" }));
+  var card = el("div", { class: "card" });
+  var name = el("input", { maxlength: "40", placeholder: "e.g. Shadow Speed" });
+  var desc = el("textarea", { maxlength: "200", placeholder: "Mod chip description" });
+  var cat = el("select");
+  Object.keys(D.cats).forEach(function (c) { cat.appendChild(el("option", { value: c, text: catName(c) })); });
+  var effects = [];
+  var effBox = el("div");
+  function effRow(i, optional) {
+    var type = el("select"), mag = el("input", { type: "number", step: "0.01", min: "0.01", max: "10", value: "1.20" });
+    var hint = el("div", { class: "hint" });
+    function fill() {
+      type.innerHTML = "";
+      if (optional) type.appendChild(el("option", { value: "", text: "— None —" }));
+      Object.keys(D.cats[cat.value].types).forEach(function (t) { type.appendChild(el("option", { value: t, text: effName(t) })); });
+      if (optional) type.value = "";
+      upd();
+    }
+    function upd() {
+      var r = D.cats[cat.value].types[type.value];
+      mag.disabled = !type.value;
+      hint.textContent = r ? "In-game range: ×" + r.min + " – ×" + r.max + ".  1.00 = no change, 1.50 = 50% more, 0.50 = half." : "";
+    }
+    type.addEventListener("change", upd);
+    effBox.appendChild(el("div", {}, [el("label", { text: "Effect " + i }), type, el("label", { text: "Multiplier" }), mag, hint]));
+    effects.push({ type: type, mag: mag, fill: fill });
+  }
+  effRow(1, false); effRow(2, true);
+  cat.addEventListener("change", function () { effects.forEach(function (e) { e.fill(); }); });
+  var star = el("select");
+  [1, 2, 3].forEach(function (n) { star.appendChild(el("option", { value: String(n), text: stars(n) })); });
+  var buyback = el("input", { type: "number", min: "0", value: "10" });
+  var amount = el("input", { type: "number", min: "0", value: "1" });
+
+  [el("label", { text: "Name" }), name, el("label", { text: "Description" }), desc, el("label", { text: "Category" }), cat,
+   effBox, el("label", { text: "Stars" }), star, el("label", { text: "Parts when sold" }), buyback,
+   el("label", { text: "Amount to add to inventory" }), amount].forEach(function (n) { card.appendChild(n); });
+  root.appendChild(card);
+  effects.forEach(function (e) { e.fill(); });
+
+  root.appendChild(el("button", { class: "btn full", text: "Create", onclick: function () {
+    var title = name.value.trim();
+    if (!title) { toast("Enter a name", "bad"); return; }
+    var ef = { EffectCategory: cat.value }, n = 0;
+    for (var i = 0; i < effects.length; i++) {
+      var t = effects[i].type.value, v = parseFloat(effects[i].mag.value);
+      if (!t) continue;
+      if (isNaN(v) || v <= 0) { toast("Invalid multiplier", "bad"); return; }
+      n++; ef["EffectType_" + n] = t; ef["EffectMag_" + n] = Math.round(v * 100) / 100;
+    }
+    var id = "Custom_" + slug(title);
+    var entry = {
+      ModLogical: id, ModName: "custom_mod_name_" + id, ConcreteItemID: "Mod_" + id,
+      ModDesc: "custom_mod_desc_" + id, ModType: "Functional", Effects: ef,
+      DropWeight: 0, PartsBuyback: Math.max(0, parseInt(buyback.value, 10) || 0),
+      Stars: parseInt(star.value, 10), ArtAssets: JSON.parse(JSON.stringify(D.cats[cat.value].art))
+    };
+    custom.mods.push(entry);
+    addLoc(entry.ModName, title);
+    addLoc(entry.ModDesc, desc.value.trim() || title);
+    custom.meta[id] = { kind: "mod", created: Date.now() };
+    var a = Math.max(0, parseInt(amount.value, 10) || 0);
+    if (a) state.ModInventory[id] = a;
+    bumpCustom();
+    save();
+    show("mods");
+  } }));
+}
+
+// ------------------------------------------------------------------ Skins
+function suitName(s) { return locText((s.AnimatronicNames || {}).Default, s.Logical); }
+
+function renderSkins(root) {
+  root.appendChild(el("button", { class: "btn full", text: "+ Create a new skin", onclick: function () { renderSkinForm(root); } }));
+  root.appendChild(el("h2", { text: "Skins you own" }));
+  allSuits().forEach(function (s) {
+    var id = s.Logical, inv = state.Inventory[id];
+    var cb = el("input", { type: "checkbox" });
+    cb.checked = !!(inv && inv.PlushSuit > 0);
+    if (id === "BareEndo") cb.disabled = true;
+    cb.addEventListener("change", function () {
+      if (!state.Inventory[id]) state.Inventory[id] = suitInv();
+      state.Inventory[id].PlushSuit = cb.checked ? 1 : 0;
+      markDirty("state");
+    });
+    root.appendChild(el("div", { class: "card row" }, [
+      el("div", { class: "grow" }, [
+        el("div", { class: "name" }, [suitName(s), isCustom(id) ? el("span", { class: "tag", text: "custom" }) : null]),
+        el("div", { class: "sub", text: s.SkinCategory + (isCustom(id) ? " model" : "") })
+      ]),
+      el("label", { class: "switch" }, [cb, el("i")])
+    ]));
+  });
+}
+
+function renderSkinForm(root) {
+  root.innerHTML = "";
+  root.appendChild(el("button", { class: "btn ghost", text: "← Back", onclick: function () { show("skins"); } }));
+  root.appendChild(el("h2", { text: "New skin" }));
+  root.appendChild(el("div", { class: "warn", text: "A new skin uses the 3D look of the model you pick. It gets its own name, description and inventory slot. Changing the look itself (textures) is not possible in this app." }));
+  var card = el("div", { class: "card" });
+  var name = el("input", { maxlength: "40", placeholder: "e.g. Crimson Freddy" });
+  var desc = el("textarea", { maxlength: "200", placeholder: "Skin description" });
+  var model = el("select");
+  D.suits.filter(function (s) { return s.SkinCategory && s.ArtAssets && s.ArtAssets.Animatronic3D; })
+    .forEach(function (s) { model.appendChild(el("option", { value: s.Logical, text: suitName(s) })); });
+  var own = el("input", { type: "checkbox" }); own.checked = true;
+  [el("label", { text: "Name" }), name, el("label", { text: "Description" }), desc, el("label", { text: "Model (look)" }), model,
+   el("div", { class: "row", style: "margin-top:12px" }, [el("div", { class: "grow", text: "Add to inventory" }), el("label", { class: "switch" }, [own, el("i")])])
+  ].forEach(function (n) { card.appendChild(n); });
+  root.appendChild(card);
+
+  root.appendChild(el("button", { class: "btn full", text: "Create", onclick: function () {
+    var title = name.value.trim();
+    if (!title) { toast("Enter a name", "bad"); return; }
+    var base = D.suits.filter(function (s) { return s.Logical === model.value; })[0];
+    var id = "Custom_" + slug(title);
+    var entry = JSON.parse(JSON.stringify(base));
+    entry.Logical = id;
+    entry.ConcreteItemID = "PlushSuit_" + id;
+    entry.AnimatronicNames = { Default: "custom_suit_name_" + id };
+    entry.AnimPlayerFacingText = { PlushSuitDescription: desc.value.trim() || title };
+    entry.Status = { LiveState: "State_Active", AvailableDate: "2019-01-01T00:00:00.000Z" };
+    entry.PlayerAcquirable = true;
+    entry.SkinOrder = 300;
+    custom.plushsuits.push(entry);
+    addLoc(entry.AnimatronicNames.Default, title);
+    custom.meta[id] = { kind: "suit", base: base.Logical, created: Date.now() };
+    if (own.checked) state.Inventory[id] = suitInv();
+    bumpCustom();
+    save();
+    show("skins");
+  } }));
+}
+
+// ------------------------------------------------------------------ Custom content
+function removeCustom(id) {
+  var meta = custom.meta[id] || {};
+  var drop = function (arr, key) { return arr.filter(function (e) { return e[key] !== id; }); };
+  custom.mods = drop(custom.mods, "ModLogical");
+  custom.plushsuits = drop(custom.plushsuits, "Logical");
+  custom.loc = custom.loc.filter(function (e) { return e.ID.indexOf("_" + id) < 0; });
+  delete custom.meta[id];
+  delete state.ModInventory[id];
+  delete state.Inventory[id];
+  // Also remove it from endoskeletons and animatronics that have it equipped.
+  var fix = function (endo) {
+    if (!endo) return;
+    if (endo.mods) endo.mods = endo.mods.filter(function (m) { return m !== id; });
+    if (endo.plushSuit === id) endo.plushSuit = meta.base || "BareEndo";
+  };
+  (state.Warehouse || []).forEach(function (w) { fix(w.endoskeleton); });
+  Object.keys(state.Entities || {}).forEach(function (k) { fix(state.Entities[k].endoskeleton); });
+  dirtyWorld = true;
+  bumpCustom();
+}
+
+function renderCustom(root) {
+  var ids = Object.keys(custom.meta);
+  if (!ids.length) {
+    root.appendChild(el("div", { class: "card sub", text: "You have not created any custom mod chips or skins yet. Create them in the Mod Chips and Skins tabs." }));
+    return;
+  }
+  ids.forEach(function (id) {
+    var meta = custom.meta[id];
+    var title = meta.kind === "mod"
+      ? locText("custom_mod_name_" + id, id)
+      : locText("custom_suit_name_" + id, id);
+    var sub = meta.kind === "mod" ? "Mod chip" : "Skin · model: " + meta.base;
+    root.appendChild(el("div", { class: "card row" }, [
+      el("div", { class: "grow" }, [el("div", { class: "name", text: title }), el("div", { class: "sub", text: sub })]),
+      el("button", { class: "btn danger", text: "Delete", onclick: function () {
+        if (!confirm("Delete “" + title + "”? It will also be removed from your inventory and any endoskeleton it is equipped on.")) return;
+        removeCustom(id); save(); show("custom");
+      } })
+    ]));
+  });
+}
+
+// ------------------------------------------------------------------ save / tabs
+function save() {
+  try {
+    if (dirtyCustom) writeJson(CUSTOM, custom);
+    if (dirtyState) {
+      // The server may have changed the save meanwhile: re-read it and only overwrite
+      // the fields the editor manages.
+      var fresh = readJson(STATE) || state;
+      var keys = ["Currency", "ModInventory", "Inventory"];
+      if (dirtyWorld) keys.push("Warehouse", "Entities");
+      keys.forEach(function (k) { fresh[k] = state[k]; });
+      writeJson(STATE, fresh);
+      state = fresh;
+    }
+    dirtyState = dirtyCustom = dirtyWorld = false;
+    document.getElementById("savebar").className = "savebar";
+    document.getElementById("status").textContent = "Save: " + Android.basePath() + " · custom content version " + custom.version;
+    toast("Saved. Reopen the game to see it.", "ok");
+  } catch (e) {
+    toast("Could not save: " + e.message, "bad");
+  }
+}
+
+var current = "money";
+function show(tab) {
+  current = tab;
+  Array.prototype.forEach.call(document.querySelectorAll("#tabs button"), function (b) {
+    b.className = b.getAttribute("data-tab") === tab ? "on" : "";
+  });
+  var root = document.getElementById("main");
+  root.innerHTML = "";
+  ({ money: renderMoney, mods: renderMods, skins: renderSkins, custom: renderCustom })[tab](root);
+  window.scrollTo(0, 0);
+}
+
+document.getElementById("tabs").addEventListener("click", function (e) {
+  var t = e.target.getAttribute("data-tab");
+  if (t && state) show(t);
+});
+document.getElementById("saveBtn").addEventListener("click", save);
+
+if (load()) show("money");
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+ "resultExtras": {},
+ "scriptData": {
+  "version": "8.0.0",
+  "masterDataVersion": -1,
+  "assetDataVersion": -1,
+  "currentLanguage": "English",
+  "VersionMemento": {
+   "ClientVersion": "8.0.0",
+   "MasterDataVersion": 800,
+   "AssetDataVersion": 1219,
+   "ForcedUpdateRequired": false,
+   "ForcedUpdateUrl": "itms://apps.apple.com/app/apple-store/id1473886685?mt=8"
+  },
+  "serverVersion": "FNaF AR 8.0.0",
+  "clientLanguage": "English",
+  "clientPlatform": "u",
+  "currentSessionToken": "00000000-0000-0000-0000-000000000000",
+  "PlayerProfile": {
+   "avatarId": "default",
+   "displayName": "0000000000000000",
+   "fazPassInviteTokenList": [],
+   "inviteTokenList": [],
+   "userId": "0000000000000000",
+   "userName": "0000000000000000"
+  },
+  "PlayerTitleId": "1111111111111111"
+ }
+}

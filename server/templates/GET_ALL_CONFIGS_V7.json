@@ -1,0 +1,11 @@
+{
+ "resultExtras": {},
+ "scriptData": {
+  "BundleURI": "https://raw.githubusercontent.com/Forsaken-Gaming/Forsaken-AR-CDN/main/8.0.0/Bundles/",
+  "VersionURI": "https://raw.githubusercontent.com/Forsaken-Gaming/Forsaken-AR-CDN/main/8.0.0/TOC",
+  "MasterDataBaseURI": "https://raw.githubusercontent.com/Forsaken-Gaming/Forsaken-AR-CDN/main/8.0.0/Masterdata/",
+  "CvDataUri": "https://raw.githubusercontent.com/Forsaken-Gaming/Forsaken-AR-CDN/main/ssd_mobilenet_v2_coco_2018_03_29.mlmodel",
+  "AssetDataVersion": 1219,
+  "MasterDataVersion": 800
+ }
+}

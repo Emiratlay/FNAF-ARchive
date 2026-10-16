@@ -1,0 +1,29 @@
+# Game files: never commit (copyrighted, bring your own APK)
+*.apk
+*.ipa
+*.idsig
+patcher/input/
+patcher/build/
+
+# Downloaded tools (tools/setup_tools.py)
+tools/*
+!tools/setup_tools.py
+
+# Server runtime data: game assets, saves, captures (contain session tokens), logs
+server/cdn/
+server/save/
+server/custom/
+server/captures/
+server/settings.json
+server/*.log
+server/logcat.txt
+
+# Editor build and test output
+editor/build/
+editor/test/data/
+editor/test/.edge/
+
+__pycache__/
+*.pyc
+*.tmp
+*.bak

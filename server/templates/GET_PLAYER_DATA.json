@@ -1,0 +1,137 @@
+{
+ "resultExtras": {},
+ "scriptData": {
+  "StreakData": {
+   "CurrentStreak": 0,
+   "BestStreak": 0
+  },
+  "PlayerProfile": {
+   "avatarId": "default",
+   "displayName": "0000000000000000",
+   "fazPassInviteTokenList": [],
+   "inviteTokenList": [],
+   "userId": "0000000000000000",
+   "userName": "0000000000000000"
+  },
+  "PlayerTitleId": "1111111111111111",
+  "Currency": {
+   "PARTS": 0,
+   "ESSENCE": 0,
+   "FAZ_TOKENS": 0
+  },
+  "Inventory": {
+   "BareEndo": {
+    "Auto": 0,
+    "Common": 0,
+    "ControlKeys": 0,
+    "PlushSuit": 1,
+    "Rare": 0,
+    "Uncommon": 0
+   }
+  },
+  "CPUInventory": {
+   "BareEndo": 1
+  },
+  "ModInventory": {},
+  "PlayerDeviceData": {
+   "active": {
+    "EMFMeter": {},
+    "ExtraBattery": {},
+    "FriendOrFoeTransponder": {},
+    "HomeInvasion": {},
+    "Lure": {},
+    "RadioJammer": {},
+    "SalvageScanner": {},
+    "SuperShocker": {}
+   },
+   "pending": [],
+   "purchased": {}
+  },
+  "ProfileAvatar": [
+   "default",
+   "male",
+   "female"
+  ],
+  "Inbox": {},
+  "PlayerTutorialData": {
+   "Entries": [
+    {
+     "GuideNodeId": "FTUE_start_from_server",
+     "TutorialKey": "FTUE"
+    },
+    {
+     "GuideNodeId": "autotrigger_0",
+     "TutorialKey": "AUTOTRIGGER_0"
+    }
+   ]
+  },
+  "PlayerFeatureFlags": {
+   "flags": [
+    {
+     "AlertState": 0,
+     "EssenceState": 0,
+     "ResultsReturnToCameraState": 0,
+     "ScaryMoodState": 0,
+     "ScreenSleepState": 0,
+     "SkipTosState": 0,
+     "SpawnState": 0,
+     "StaySafeState": 0,
+     "TopBarState": 0
+    },
+    {
+     "AlertState": 2,
+     "EssenceState": 2,
+     "ResultsReturnToCameraState": 2,
+     "ScaryMoodState": 2,
+     "ScreenSleepState": 2,
+     "SkipTosState": 0,
+     "SpawnState": 2,
+     "StaySafeState": 2,
+     "TopBarState": 2,
+     "TutorialKey": "FTUE"
+    }
+   ]
+  },
+  "PlayerStatsData": {
+   "totalEssence": 0,
+   "plushSuitDefeatDataList": {
+    "ShadowBonnie": {
+     "ShadowBonnie_Easy": 0,
+     "ShadowBonnie_Medium": 0,
+     "ShadowBonnie_Hard": 0,
+     "ShadowBonnie_Insane": 0
+    }
+   }
+  },
+  "friendCode": "XXXXXXXXXX",
+  "PlayerSeasonalData": {},
+  "Time": 0,
+  "PassiveRequestList": [
+   "SAVE_ENTITIES_V3",
+   "REQUEST_ENTITIES_V8",
+   "CLIENT_HEARTBEAT",
+   "GET_ANIMATRONIC_DATA",
+   "GET_PLAYER_DATA",
+   "GET_WORKSHOP_DATA",
+   "GET_ALL_CONFIGS_V7",
+   "SCAVENGE_PERIOD_CHECK_V3",
+   "SCAVENGE_PERIOD_CHECK_V4",
+   "AUTHENTICATE_GETSOCIAL",
+   "GET_OWNED_GOODS"
+  ],
+  "PlayerAlertData": {
+   "alertsToTrigger": {},
+   "cooldownTimers": [],
+   "firedAlerts": [],
+   "lastDailyCheck": 0,
+   "nonRepeatableAlerts": []
+  },
+  "PlayerSubscriptionData": {
+   "LastRewardedTime": -1,
+   "SubscriptionEndTime": -1
+  },
+  "PlayerTapjoyData": [],
+  "UnlockedEndoskeletonSlots": 1,
+  "PurchasedEndoskeletonSlots": 0
+ }
+}

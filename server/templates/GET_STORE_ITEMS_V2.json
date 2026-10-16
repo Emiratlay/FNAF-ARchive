@@ -1,0 +1,353 @@
+{
+ "resultExtras": {
+  "playerPassThroughData": {}
+ },
+ "scriptData": {
+  "PlayerStoreData": {
+   "DeferredPaymentTimestamp": -1
+  },
+  "StoreItems": {
+   "Stores": [
+    {
+     "EndTime": null,
+     "Items": [
+      {
+       "ItemId": "Endoskeleton_01",
+       "VirtualCurrencyPrices": {
+        "FC": 300
+       }
+      },
+      {
+       "ItemId": "Endoskeleton_02",
+       "VirtualCurrencyPrices": {
+        "FC": 750
+       }
+      },
+      {
+       "ItemId": "Endoskeleton_03",
+       "VirtualCurrencyPrices": {
+        "FC": 1500
+       }
+      },
+      {
+       "ItemId": "Endoskeleton_04",
+       "VirtualCurrencyPrices": {
+        "FC": 3000
+       }
+      },
+      {
+       "ItemId": "Pack_FreddyFazbear",
+       "VirtualCurrencyPrices": {
+        "FC": 650
+       }
+      },
+      {
+       "ItemId": "Pack_Bonnie",
+       "VirtualCurrencyPrices": {
+        "FC": 650
+       }
+      },
+      {
+       "ItemId": "Pack_BalloonBoy",
+       "VirtualCurrencyPrices": {
+        "FC": 650
+       }
+      },
+      {
+       "ItemId": "Pack_Chica",
+       "VirtualCurrencyPrices": {
+        "FC": 650
+       }
+      },
+      {
+       "ItemId": "Pack_Foxy",
+       "VirtualCurrencyPrices": {
+        "FC": 650
+       }
+      },
+      {
+       "ItemId": "Pack_Baby",
+       "VirtualCurrencyPrices": {
+        "FC": 1250
+       }
+      },
+      {
+       "ItemId": "Pack_Springtrap",
+       "VirtualCurrencyPrices": {
+        "FC": 2500
+       }
+      },
+      {
+       "ItemId": "Lure_FreddyFazbear",
+       "VirtualCurrencyPrices": {
+        "FC": 300
+       }
+      },
+      {
+       "ItemId": "Lure_Bonnie",
+       "VirtualCurrencyPrices": {
+        "FC": 300
+       }
+      },
+      {
+       "ItemId": "Lure_BalloonBoy",
+       "VirtualCurrencyPrices": {
+        "FC": 300
+       }
+      },
+      {
+       "ItemId": "Lure_Chica",
+       "VirtualCurrencyPrices": {
+        "FC": 300
+       }
+      },
+      {
+       "ItemId": "Lure_Foxy",
+       "VirtualCurrencyPrices": {
+        "FC": 300
+       }
+      },
+      {
+       "ItemId": "Lure_Baby",
+       "VirtualCurrencyPrices": {
+        "FC": 500
+       }
+      },
+      {
+       "ItemId": "Lure_Springtrap",
+       "VirtualCurrencyPrices": {
+        "FC": 1000
+       }
+      },
+      {
+       "ItemId": "ExtraBattery",
+       "VirtualCurrencyPrices": {
+        "FC": 100,
+        "PA": 400
+       }
+      },
+      {
+       "ItemId": "FriendOrFoeTransponder",
+       "VirtualCurrencyPrices": {
+        "PA": 90
+       }
+      },
+      {
+       "ItemId": "SalvageScanner",
+       "VirtualCurrencyPrices": {
+        "PA": 60
+       }
+      },
+      {
+       "ItemId": "EMFMeter",
+       "VirtualCurrencyPrices": {
+        "PA": 100
+       }
+      },
+      {
+       "ItemId": "Lure_ToyFreddy",
+       "VirtualCurrencyPrices": {
+        "FC": 900
+       }
+      },
+      {
+       "ItemId": "Pack_ToyFreddy",
+       "VirtualCurrencyPrices": {
+        "FC": 2300
+       }
+      },
+      {
+       "ItemId": "regularLure_ToyChica",
+       "VirtualCurrencyPrices": {
+        "FC": 1600
+       }
+      },
+      {
+       "ItemId": "miniPack_ToyChica",
+       "VirtualCurrencyPrices": {
+        "FC": 4200
+       }
+      },
+      {
+       "ItemId": "Pack_ToyBonnie",
+       "VirtualCurrencyPrices": {
+        "FC": 2300
+       }
+      },
+      {
+       "ItemId": "Lure_ToyBonnie",
+       "VirtualCurrencyPrices": {
+        "FC": 900
+       }
+      },
+      {
+       "ItemId": "Lure_ClownSpringtrapSkin",
+       "VirtualCurrencyPrices": {
+        "FC": 900
+       }
+      },
+      {
+       "ItemId": "Lure_MagicianMangleSkin",
+       "VirtualCurrencyPrices": {
+        "FC": 900
+       }
+      },
+      {
+       "ItemId": "Lure_RingmasterFoxySkin",
+       "VirtualCurrencyPrices": {
+        "FC": 800
+       }
+      },
+      {
+       "ItemId": "Lure_Ballora",
+       "VirtualCurrencyPrices": {
+        "FC": 1400
+       }
+      },
+      {
+       "ItemId": "Lure_FlamingSpringtrapSkin",
+       "VirtualCurrencyPrices": {
+        "FC": 900
+       }
+      },
+      {
+       "ItemId": "Lure_ScorchingChicaSkin",
+       "VirtualCurrencyPrices": {
+        "FC": 900
+       }
+      },
+      {
+       "ItemId": "Lure_FlamethrowerBareEndoSkin",
+       "VirtualCurrencyPrices": {
+        "FC": 900
+       }
+      },
+      {
+       "ItemId": "Lure_LibertyChicaSkin",
+       "VirtualCurrencyPrices": {
+        "FC": 700
+       }
+      },
+      {
+       "ItemId": "Lure_FireworkFreddySkin",
+       "VirtualCurrencyPrices": {
+        "FC": 700
+       }
+      },
+      {
+       "ItemId": "Lure_ToxicSpringtrapSkin",
+       "VirtualCurrencyPrices": {
+        "FC": 800
+       }
+      },
+      {
+       "ItemId": "Lure_RadioactiveFoxySkin",
+       "VirtualCurrencyPrices": {
+        "FC": 700
+       }
+      },
+      {
+       "ItemId": "Lure_EightBitBaby",
+       "VirtualCurrencyPrices": {
+        "FC": 900
+       }
+      },
+      {
+       "ItemId": "Lure_SystemErrorToyBonnieSkin",
+       "VirtualCurrencyPrices": {
+        "FC": 700
+       }
+      },
+      {
+       "ItemId": "Lure_HighscoreToyChicaSkin",
+       "VirtualCurrencyPrices": {
+        "FC": 700
+       }
+      },
+      {
+       "ItemId": "Lure_VRToyFreddySkin",
+       "VirtualCurrencyPrices": {
+        "FC": 700
+       }
+      },
+      {
+       "ItemId": "Lure_Bonnie_EasterBonnieSkin",
+       "VirtualCurrencyPrices": {
+        "FC": 600
+       }
+      },
+      {
+       "ItemId": "Lure_Bonnie_ChocolateBonnieSkin",
+       "VirtualCurrencyPrices": {
+        "FC": 600
+       }
+      },
+      {
+       "ItemId": "Lure_FreddyFazbear_ShamrockSkin",
+       "VirtualCurrencyPrices": {
+        "FC": 400
+       }
+      },
+      {
+       "ItemId": "Lure_Mangle",
+       "VirtualCurrencyPrices": {
+        "FC": 1300
+       }
+      },
+      {
+       "ItemId": "Lure_Frostbear",
+       "VirtualCurrencyPrices": {
+        "FC": 1000
+       }
+      },
+      {
+       "ItemId": "RadioJammer",
+       "VirtualCurrencyPrices": {
+        "PA": 225
+       }
+      },
+      {
+       "ItemId": "Fazcoin_Roll_hardcurrency_03",
+       "VirtualCurrencyPrices": {
+        "PA": 250
+       }
+      },
+      {
+       "ItemId": "Fazcoin_Stack_hardcurrency_05",
+       "VirtualCurrencyPrices": {
+        "PA": 550
+       }
+      },
+      {
+       "ItemId": "Fazcoin_Cup_hardcurrency_06",
+       "VirtualCurrencyPrices": {
+        "PA": 1050
+       }
+      },
+      {
+       "ItemId": "Fazcoin_Tub_hardcurrency_07",
+       "VirtualCurrencyPrices": {
+        "PA": 1850
+       }
+      },
+      {
+       "ItemId": "Home_Invasion_Pack",
+       "VirtualCurrencyPrices": {
+        "FC": 300
+       }
+      },
+      {
+       "ItemId": "Lure_BroilerBabySkin",
+       "VirtualCurrencyPrices": {
+        "FC": 900
+       }
+      }
+     ],
+     "Name": "Default",
+     "Type": "Event",
+     "Version": 418
+    }
+   ]
+  }
+ }
+}

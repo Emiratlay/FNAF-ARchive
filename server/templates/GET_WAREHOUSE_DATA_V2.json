@@ -1,0 +1,21 @@
+{
+ "resultExtras": {},
+ "scriptData": {
+  "WarehouseDataV2": [
+   {
+    "status": "Available",
+    "lastCommand": 0,
+    "entityId": "",
+    "wearAndTear": 100,
+    "endoskeleton": {
+     "cpu": "BareEndo",
+     "plushSuit": "BareEndo",
+     "mods": [],
+     "essence": 0
+    },
+    "receiverId": "",
+    "appointmentId": ""
+   }
+  ]
+ }
+}
