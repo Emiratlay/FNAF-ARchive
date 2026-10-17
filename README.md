@@ -67,16 +67,21 @@ Everything below runs offline. 40 of the game's CloudScript calls are emulated:
   - repair wear and tear;
   - sell mod chips.
 - **Scavenging:** send out, collect rewards when it returns, recall.
-- **Sending animatronics:** send your endo to yourself; it arrives and attacks with your CPU. Recall and express delivery also work.
+- **Sending animatronics:** send your endo to yourself; it arrives and attacks with your CPU. Recall works too.
+- **Express delivery:** pay 50 Faz-Coins to bring an animatronic on the map to you now.
 - **Store:**
   - devices, lures, character packs, endoskeleton slots, Faz-Coins for parts;
   - prices come from the store list and contents from the game's store data.
-- **Devices:** activating salvage scanners, EMF meters and radio jammers. Lures bring the lured animatronic.
+- **Devices:**
+  - the Salvage Scanner gives +25% parts on your next win;
+  - the EMF Meter makes rare remnant colours likelier for 10 uses;
+  - lures bring the lured animatronic;
+  - timed devices such as the Radio Jammer expire on schedule.
 - **Remnant:** server-side remnant nodes; the colour decides the amount.
 - **Shadow Bonnie:** remnant encounters (Easy → Insane).
 - **Daily challenges:** every challenge type, changing a challenge, collecting the reward.
 - **Profile:** avatar, display name, friend codes.
-- **Editor:** money, inventory, custom mod chips and skins.
+- **Editor:** money, inventory, CPUs, custom mod chips, skins and CPUs.
 
 How each call was made:
 
@@ -265,6 +270,7 @@ If you created new mod chips or skins, the game downloads updated game data at s
 | **Money** | Set Parts, Faz-Coins and Remnant. Quick +100 / +1000 / +10000 buttons. |
 | **Mod Chips** | Every mod chip in the game; **+ / −** changes how many you own. **+ Create a new mod chip** lets you design one (see below). |
 | **Skins** | Switch on the skins you want to own. **+ Create a new skin** lets you create one (see below). |
+| **CPUs** | Every CPU a player can equip (Freddy, Toy Bonnie, Springtrap…); **+ / −** changes how many you own. **+ Create a new CPU** lets you design one (see below). |
 | **Custom** | Lists what you created. **Delete** removes an item from the game, your inventory and any endoskeleton it is equipped on. |
 
 **Creating a mod chip.** You choose these fields:
@@ -275,6 +281,20 @@ If you created new mod chips or skins, the game downloads updated game data at s
 - star rating and sell value.
 
 For the multiplier, 1.00 means no change, 1.50 means 50% more and 0.50 means half. Each effect shows the range the original game uses. Start close to that range; extreme values can make the game behave strangely.
+
+**Creating a CPU.** Pick a base CPU, whose behaviour is copied, and a look, whose 3D model and sounds are used. Then tune:
+
+- **charge chance:** how often it charges after a pause;
+- **jumpscare chance:** chance to jumpscare during a charge without waiting for the shock;
+- **shock window;**
+- **circling speed;**
+- **initial pause;**
+- **disruption chance;**
+- **map speed;**
+- **aggression;**
+- **parts reward.**
+
+The new CPU gets its own attack profile. You can equip it in the workshop, send it to yourself and, if you switch on **Spawns in the wild**, meet it as a wild animatronic once your best streak is high enough. Defeating it can drop the CPU itself.
 
 **Creating a skin.** Choose a name, a description and an existing model to use for the look. The new skin is a separate item with its own name and inventory slot, but it **looks like the model you picked**. Changing the look (textures) is not possible in the app.
 

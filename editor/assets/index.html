@@ -68,6 +68,7 @@
   <button data-tab="money" class="on">Money</button>
   <button data-tab="mods">Mod Chips</button>
   <button data-tab="skins">Skins</button>
+  <button data-tab="cpus">CPUs</button>
   <button data-tab="custom">Custom</button>
 </nav>
 <main id="main"></main>
@@ -119,7 +120,7 @@ var D = {};   // base: mods, cats, suits, loc
 var state = null, custom = null;
 var dirtyState = false, dirtyCustom = false, dirtyWorld = false;
 
-function emptyCustom() { return { version: 0, mods: [], plushsuits: [], cpus: [], loc: [], meta: {} }; }
+function emptyCustom() { return { version: 0, mods: [], plushsuits: [], cpus: [], attacks: [], loc: [], meta: {} }; }
 
 function load() {
   if (!window.Android) { fail("This page only works inside the FNAF AR Editor app."); return false; }
@@ -131,13 +132,16 @@ function load() {
     return false;
   }
   custom = readJson(CUSTOM) || emptyCustom();
-  ["mods", "plushsuits", "cpus", "loc"].forEach(function (k) { if (!custom[k]) custom[k] = []; });
+  ["mods", "plushsuits", "cpus", "attacks", "loc"].forEach(function (k) { if (!custom[k]) custom[k] = []; });
   if (!custom.meta) custom.meta = {};
   if (typeof custom.version !== "number") custom.version = 0;
 
   var mods = readJson(MD + "MODS_DATA"), suits = readJson(MD + "PLUSHSUIT_DATA"), loc = readJson(MD + "LOC_DATA");
   if (!mods || !suits || !loc) { fail("Could not read game data (" + Android.basePath() + "/" + MD + ")."); return false; }
   D.mods = mods.Entries; D.suits = suits.Entries;
+  var cpus = readJson(MD + "CPU_DATA"), attacks = readJson(MD + "ATTACK_DATA");
+  if (!cpus || !attacks) { fail("Could not read game data (CPU_DATA / ATTACK_DATA)."); return false; }
+  D.cpus = cpus.Entries; D.attacks = attacks.Entries;
   D.loc = {};
   loc.Entries.forEach(function (e) { D.loc[e.ID] = e.English; });
 
@@ -156,6 +160,7 @@ function load() {
   if (!state.Currency) state.Currency = { PARTS: 0, ESSENCE: 0, FAZ_TOKENS: 0 };
   if (!state.ModInventory) state.ModInventory = {};
   if (!state.Inventory) state.Inventory = {};
+  if (!state.CPUInventory) state.CPUInventory = { BareEndo: 1 };
 
   document.getElementById("status").textContent =
     "Save: " + Android.basePath() + " · custom content version " + custom.version;
@@ -411,24 +416,234 @@ function renderSkinForm(root) {
   } }));
 }
 
+// ------------------------------------------------------------------ CPUs
+// CPUs a player can equip: main CPUs without an underscore (FreddyFazbear, ToyBonnie...) + custom CPUs.
+function playerCpus() {
+  return D.cpus.filter(function (c) {
+    return c.Logical.indexOf("_") < 0 && c.Logical.indexOf("ShadowBonnie") < 0;
+  }).concat(custom.cpus);
+}
+function cpuName(c) { return locText((c.AnimatronicNames || {}).Default, c.Logical); }
+function attackOf(name) {
+  var all = D.attacks.concat(custom.attacks);
+  for (var i = 0; i < all.length; i++) if (all[i].Logical === name) return all[i];
+  return null;
+}
+// Reads/writes the value at path a.b.c; leaves it alone if the path does not exist.
+function getPath(o, path) {
+  var parts = path.split(".");
+  for (var i = 0; i < parts.length; i++) { if (o == null || !(parts[i] in o)) return undefined; o = o[parts[i]]; }
+  return o;
+}
+function setPath(o, path, v) {
+  var parts = path.split(".");
+  for (var i = 0; i < parts.length - 1; i++) { if (o == null || !(parts[i] in o)) return false; o = o[parts[i]]; }
+  if (o == null || !(parts[parts.length - 1] in o)) return false;
+  o[parts[parts.length - 1]] = v; return true;
+}
+
+function renderCpus(root) {
+  root.appendChild(el("button", { class: "btn full", text: "+ Create a new CPU", onclick: function () { renderCpuForm(root); } }));
+  var q = el("input", { type: "search", placeholder: "Search…", style: "margin:12px 0" });
+  var list = el("div");
+  function draw() {
+    list.innerHTML = "";
+    var term = q.value.toLowerCase();
+    playerCpus().forEach(function (c) {
+      var id = c.Logical, nm = cpuName(c);
+      if (term && (nm + " " + id).toLowerCase().indexOf(term) < 0) return;
+      var count = el("span", { text: String(state.CPUInventory[id] || 0) });
+      function set(n) {
+        if (n <= 0 && id !== "BareEndo") delete state.CPUInventory[id]; else state.CPUInventory[id] = Math.max(n, id === "BareEndo" ? 1 : 0);
+        count.textContent = String(state.CPUInventory[id] || 0); markDirty("state");
+      }
+      list.appendChild(el("div", { class: "card row" }, [
+        el("div", { class: "grow" }, [
+          el("div", { class: "name" }, [nm, isCustom(id) ? el("span", { class: "tag", text: "custom" }) : null]),
+          el("div", { class: "sub", text: "Look: " + (c.PlushSuitRef || "-") + (c.Rank ? " · Rank " + c.Rank : "") })
+        ]),
+        el("div", { class: "stepper" }, [
+          el("button", { text: "−", onclick: function () { set((state.CPUInventory[id] || 0) - 1); } }),
+          count,
+          el("button", { text: "+", onclick: function () { set((state.CPUInventory[id] || 0) + 1); } })
+        ])
+      ]));
+    });
+  }
+  q.addEventListener("input", draw);
+  root.appendChild(q); root.appendChild(list); draw();
+}
+
+// Attack settings a custom CPU can change (ATTACK_DATA paths).
+var ATTACK_KNOBS = [
+  { key: "charge", label: "Charge chance (%)", path: "Pause.NextPhase.Charge.Chance", pct: true,
+    hint: "Chance to charge at you each time it pauses. Higher = more aggressive." },
+  { key: "jump", label: "Jumpscare chance (%)", path: "Charge.JumpscareChance.Chance", pct: true,
+    hint: "Chance to jumpscare during a charge without waiting for the shock." },
+  { key: "shock", label: "Shock window (seconds)", path: "Charge.ShockWindow", range: true,
+    hint: "Time you have to shock it during a charge. Larger = easier." },
+  { key: "circle", label: "Circling speed (degrees/s)", path: "Circle.DegreesPerSecond", range: true,
+    hint: "How fast it circles around you in camera mode." },
+  { key: "pause", label: "Initial pause (seconds)", path: "InitialPause.Seconds", range: true,
+    hint: "How long it waits at the start of an encounter." },
+  { key: "disrupt", label: "Disruption chance (%)", path: "Disruption.Settings.Activation.Chance", pct: true,
+    hint: "Chance to disrupt your screen. Disabled if the base profile has none." }
+];
+
+function renderCpuForm(root) {
+  root.innerHTML = "";
+  root.appendChild(el("button", { class: "btn ghost", text: "← Back", onclick: function () { show("cpus"); } }));
+  root.appendChild(el("h2", { text: "New CPU" }));
+  root.appendChild(el("div", { class: "warn", text: "A new CPU copies the behaviour of the base CPU you pick; the settings below change it. It uses the 3D model and sounds of the look you pick." }));
+  var card = el("div", { class: "card" });
+  var name = el("input", { maxlength: "40", placeholder: "e.g. Shadow Toy Bonnie" });
+  var desc = el("textarea", { maxlength: "200", placeholder: "CPU description" });
+  var base = el("select");
+  D.cpus.filter(function (c) { return c.AttackProfile && attackOf(c.AttackProfile) && c.Logical.indexOf("FTUE") < 0; })
+    .forEach(function (c) { base.appendChild(el("option", { value: c.Logical, text: cpuName(c) + " (" + c.Logical + ")" })); });
+  base.value = "ToyBonnie";
+  var look = el("select");
+  D.suits.filter(function (x) { return x.SkinCategory && x.ArtAssets && x.ArtAssets.Animatronic3D; })
+    .forEach(function (x) { look.appendChild(el("option", { value: x.Logical, text: suitName(x) })); });
+  var speed = el("input", { type: "number", step: "0.1", min: "0.1", max: "5", value: "1.0" });
+  var aggr = el("input", { type: "number", min: "1", max: "20" });
+  var partsMin = el("input", { type: "number", min: "0" }), partsMax = el("input", { type: "number", min: "0" });
+  var wild = el("input", { type: "checkbox" });
+  var minStreak = el("input", { type: "number", min: "0", value: "3" });
+  var amount = el("input", { type: "number", min: "0", value: "1" });
+  var knobInputs = {};
+  var knobBox = el("div");
+  ATTACK_KNOBS.forEach(function (k) {
+    var a = el("input", { type: "number", step: "0.01", min: "0" });
+    var b = k.range ? el("input", { type: "number", step: "0.01", min: "0" }) : null;
+    var row = k.range ? el("div", { class: "row" }, [el("div", { class: "grow" }, [a]), el("div", { text: "–" }), el("div", { class: "grow" }, [b])]) : a;
+    knobInputs[k.key] = { a: a, b: b };
+    knobBox.appendChild(el("div", {}, [el("label", { text: k.label }), row, el("div", { class: "hint", text: k.hint })]));
+  });
+  function fillFromBase() {
+    var c = D.cpus.filter(function (x) { return x.Logical === base.value; })[0];
+    var atk = attackOf(c.AttackProfile);
+    look.value = c.PlushSuitRef || "BareEndo";
+    aggr.value = String((c.Aggression || {}).Max || 5);
+    var parts = ((c.Rewards || {}).WanderingAnimatronics || {}).Parts || { Min: 10, Max: 15 };
+    partsMin.value = String(parts.Min); partsMax.value = String(parts.Max);
+    ATTACK_KNOBS.forEach(function (k) {
+      var v = getPath(atk, k.path), inp = knobInputs[k.key];
+      var off = v === undefined;
+      inp.a.disabled = off; if (inp.b) inp.b.disabled = off;
+      if (off) { inp.a.value = ""; if (inp.b) inp.b.value = ""; return; }
+      if (k.range) { inp.a.value = String(v.Min); inp.b.value = String(v.Max); }
+      else inp.a.value = String(k.pct ? Math.round(v * 1000) / 10 : v);
+    });
+  }
+  base.addEventListener("change", fillFromBase);
+  [el("label", { text: "Name" }), name, el("label", { text: "Description" }), desc,
+   el("label", { text: "Base CPU (behaviour)" }), base, el("label", { text: "Look" }), look,
+   el("h2", { text: "Attack settings" }), knobBox,
+   el("h2", { text: "On the map" }),
+   el("label", { text: "Speed multiplier" }), speed, el("div", { class: "hint", text: "How fast it approaches you on the map. 1.0 = same as the base CPU." }),
+   el("label", { text: "Aggression (maximum)" }), aggr,
+   el("label", { text: "Parts when defeated (min – max)" }),
+   el("div", { class: "row" }, [el("div", { class: "grow" }, [partsMin]), el("div", { text: "–" }), el("div", { class: "grow" }, [partsMax])]),
+   el("div", { class: "row", style: "margin-top:12px" }, [el("div", { class: "grow", text: "Spawns in the wild" }), el("label", { class: "switch" }, [wild, el("i")])]),
+   el("label", { text: "Best streak needed to spawn" }), minStreak,
+   el("label", { text: "Amount to add to inventory" }), amount
+  ].forEach(function (n) { card.appendChild(n); });
+  root.appendChild(card);
+  fillFromBase();
+
+  root.appendChild(el("button", { class: "btn full", text: "Create", onclick: function () {
+    var title = name.value.trim();
+    if (!title) { toast("Enter a name", "bad"); return; }
+    var src = D.cpus.filter(function (x) { return x.Logical === base.value; })[0];
+    var suit = D.suits.filter(function (x) { return x.Logical === look.value; })[0];
+    var id = "Custom_" + slug(title);
+    var num = function (inp, def) { var v = parseFloat(inp.value); return isNaN(v) ? def : v; };
+
+    var atk = JSON.parse(JSON.stringify(attackOf(src.AttackProfile)));
+    atk.Logical = id;
+    ATTACK_KNOBS.forEach(function (k) {
+      var inp = knobInputs[k.key], cur = getPath(atk, k.path);
+      if (cur === undefined) return;
+      if (k.range) {
+        var lo = num(inp.a, cur.Min), hi = num(inp.b, cur.Max);
+        setPath(atk, k.path, { Min: Math.min(lo, hi), Max: Math.max(lo, hi) });
+      } else {
+        var v = num(inp.a, k.pct ? cur * 100 : cur);
+        v = k.pct ? Math.max(0, Math.min(100, v)) / 100 : v;
+        setPath(atk, k.path, Math.round(v * 1000) / 1000);
+        // After a pause it either charges or circles: keep the two chances adding up to 1.
+        if (k.key === "charge" && getPath(atk, "Pause.NextPhase.Circle.Chance") !== undefined)
+          setPath(atk, "Pause.NextPhase.Circle.Chance", Math.round((1 - v) * 1000) / 1000);
+      }
+    });
+
+    var cpu = JSON.parse(JSON.stringify(src));
+    cpu.Logical = id;
+    cpu.ConcreteItemID = "CPU_" + id;
+    cpu.AnimatronicNames = { Default: "custom_cpu_name_" + id };
+    cpu.AnimPlayerFacingText = { CPUDescription: desc.value.trim() || title };
+    cpu.PlushSuitRef = look.value;
+    cpu.AttackProfile = id;
+    cpu.Status = { LiveState: "State_Active", AvailableDate: "2019-01-01T00:00:00.000Z" };
+    cpu.PlayerAcquirable = true;
+    cpu.Order = 900;
+    if (suit && suit.ArtAssets && suit.ArtAssets.Audio && cpu.ArtAssets && cpu.ArtAssets.Audio)
+      cpu.ArtAssets.Audio.SoundBank = suit.ArtAssets.Audio.SoundBank;
+    var sp = num(speed, 1);
+    if (cpu.SpeedMPH) Object.keys(cpu.SpeedMPH).forEach(function (k) {
+      var v = cpu.SpeedMPH[k];
+      if (typeof v === "number") cpu.SpeedMPH[k] = Math.round(v * sp * 100) / 100;
+      else if (v && typeof v === "object") Object.keys(v).forEach(function (kk) { if (typeof v[kk] === "number") v[kk] = Math.round(v[kk] * sp * 100) / 100; });
+    });
+    if (cpu.Aggression) cpu.Aggression.Max = Math.max(1, Math.round(num(aggr, cpu.Aggression.Max)));
+    var wa = (cpu.Rewards || {}).WanderingAnimatronics;
+    if (wa) {
+      var pmin = Math.max(0, Math.round(num(partsMin, 10))), pmax = Math.max(pmin, Math.round(num(partsMax, pmin)));
+      wa.Parts = { Min: pmin, Max: pmax };
+    }
+    cpu.SpawnByStreak = wild.checked
+      ? { RankRangeByBestStreak: { Min: Math.max(1, Math.round(num(minStreak, 1))), Max: 1000 }, RankRangeByCurrentStreak: { Min: 0, Max: 1000 } }
+      : { RankRangeByBestStreak: { Min: -1, Max: -1 }, RankRangeByCurrentStreak: { Min: -1, Max: -1 } };
+
+    custom.attacks.push(atk);
+    custom.cpus.push(cpu);
+    addLoc(cpu.AnimatronicNames.Default, title);
+    custom.meta[id] = { kind: "cpu", base: src.Logical, look: look.value, created: Date.now() };
+    var a = Math.max(0, parseInt(amount.value, 10) || 0);
+    if (a) state.CPUInventory[id] = a;
+    bumpCustom();
+    save();
+    show("cpus");
+  } }));
+}
+
 // ------------------------------------------------------------------ Custom content
 function removeCustom(id) {
   var meta = custom.meta[id] || {};
   var drop = function (arr, key) { return arr.filter(function (e) { return e[key] !== id; }); };
   custom.mods = drop(custom.mods, "ModLogical");
   custom.plushsuits = drop(custom.plushsuits, "Logical");
+  custom.cpus = drop(custom.cpus, "Logical");
+  custom.attacks = drop(custom.attacks, "Logical");
   custom.loc = custom.loc.filter(function (e) { return e.ID.indexOf("_" + id) < 0; });
   delete custom.meta[id];
   delete state.ModInventory[id];
   delete state.Inventory[id];
+  delete state.CPUInventory[id];
   // Also remove it from endoskeletons and animatronics that have it equipped.
   var fix = function (endo) {
     if (!endo) return;
     if (endo.mods) endo.mods = endo.mods.filter(function (m) { return m !== id; });
     if (endo.plushSuit === id) endo.plushSuit = meta.base || "BareEndo";
+    if (endo.cpu === id) endo.cpu = "BareEndo";
   };
   (state.Warehouse || []).forEach(function (w) { fix(w.endoskeleton); });
-  Object.keys(state.Entities || {}).forEach(function (k) { fix(state.Entities[k].endoskeleton); });
+  Object.keys(state.Entities || {}).forEach(function (k) {
+    // Animatronics using this CPU are removed; the game cannot load a CPU that no longer exists.
+    if (state.Entities[k].animatronicConfigId === id) { delete state.Entities[k]; return; }
+    fix(state.Entities[k].endoskeleton);
+  });
   dirtyWorld = true;
   bumpCustom();
 }
@@ -436,15 +651,15 @@ function removeCustom(id) {
 function renderCustom(root) {
   var ids = Object.keys(custom.meta);
   if (!ids.length) {
-    root.appendChild(el("div", { class: "card sub", text: "You have not created any custom mod chips or skins yet. Create them in the Mod Chips and Skins tabs." }));
+    root.appendChild(el("div", { class: "card sub", text: "You have not created any custom mod chips, skins or CPUs yet. Create them in the Mod Chips, Skins and CPUs tabs." }));
     return;
   }
   ids.forEach(function (id) {
     var meta = custom.meta[id];
-    var title = meta.kind === "mod"
-      ? locText("custom_mod_name_" + id, id)
-      : locText("custom_suit_name_" + id, id);
-    var sub = meta.kind === "mod" ? "Mod chip" : "Skin · model: " + meta.base;
+    var title = locText({ mod: "custom_mod_name_", suit: "custom_suit_name_", cpu: "custom_cpu_name_" }[meta.kind] + id, id);
+    var sub = meta.kind === "mod" ? "Mod chip"
+      : meta.kind === "cpu" ? "CPU · base: " + meta.base + " · look: " + meta.look
+      : "Skin · model: " + meta.base;
     root.appendChild(el("div", { class: "card row" }, [
       el("div", { class: "grow" }, [el("div", { class: "name", text: title }), el("div", { class: "sub", text: sub })]),
       el("button", { class: "btn danger", text: "Delete", onclick: function () {
@@ -463,7 +678,7 @@ function save() {
       // The server may have changed the save meanwhile: re-read it and only overwrite
       // the fields the editor manages.
       var fresh = readJson(STATE) || state;
-      var keys = ["Currency", "ModInventory", "Inventory"];
+      var keys = ["Currency", "ModInventory", "Inventory", "CPUInventory"];
       if (dirtyWorld) keys.push("Warehouse", "Entities");
       keys.forEach(function (k) { fresh[k] = state[k]; });
       writeJson(STATE, fresh);
@@ -486,7 +701,7 @@ function show(tab) {
   });
   var root = document.getElementById("main");
   root.innerHTML = "";
-  ({ money: renderMoney, mods: renderMods, skins: renderSkins, custom: renderCustom })[tab](root);
+  ({ money: renderMoney, mods: renderMods, skins: renderSkins, cpus: renderCpus, custom: renderCustom })[tab](root);
   window.scrollTo(0, 0);
 }
 

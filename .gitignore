@@ -27,3 +27,4 @@ __pycache__/
 *.pyc
 *.tmp
 *.bak
+!tools/il2dis.py

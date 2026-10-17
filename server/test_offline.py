@@ -108,6 +108,58 @@ def main():
     check("lured Foxy arrives", any(e["animatronicConfigId"] == "Foxy" and e["originData"]["animatronicOrigin"] == 1
                                     for e in new.values()))
 
+    # Express delivery of an animatronic on the map
+    s = state()
+    s["Currency"]["FAZ_TOKENS"] = 100
+    game.save_state(s)
+    on_map = next(eid for eid, e in state()["Entities"].items() if e["originData"]["animatronicOrigin"] in (0, 1))
+    r = cs("EXPRESS_DELIVERY", entityId=on_map)
+    check("express delivery updates the animatronic",
+          r.get("UpdateAnimatronicEntities", {}).get(on_map, {}).get("stateData", {}).get("expressDelivery") is True
+          and r["Currency"]["FAZ_TOKENS"] == 50, r["Currency"])
+
+    # Salvage scanner: parts bonus on a win, uses a charge
+    s = state()
+    s["PlayerDeviceData"]["purchased"]["SalvageScanner"] = 1
+    game.save_state(s)
+    cs("ACTIVATE_DEVICE", deviceConfigId="SalvageScanner")
+    s = state()
+    target = next(eid for eid, e in s["Entities"].items() if (e["rewardsV3"].get("CurrencyRewards") or {}).get("PARTS"))
+    base_parts = s["Entities"][target]["rewardsV3"]["CurrencyRewards"]["PARTS"]
+    before = s["Currency"]["PARTS"]
+    w = cs("AWARD_ENTITY_REWARDS_V2", entityId=target)
+    check("salvage scanner bonus", w["Currency"]["PARTS"] - before == int(round(base_parts * 1.25))
+          and not game.active_charges(state(), "SalvageScanner"), (base_parts, w["Currency"]["PARTS"] - before))
+
+    # EMF meter: charges used by remnant spawns
+    s = state()
+    s["PlayerDeviceData"]["purchased"]["EMFMeter"] = 1
+    game.save_state(s)
+    cs("ACTIVATE_DEVICE", deviceConfigId="EMFMeter")
+    start = game.active_charges(state(), "EMFMeter")
+    for i in range(20):
+        cs("ESSENCE_NODE_SPAWN_V2", objectTypes=["EMF_%d" % i])
+    check("EMF meter uses charges", start == 10 and game.active_charges(state(), "EMFMeter") < start,
+          (start, game.active_charges(state(), "EMFMeter")))
+
+    # Custom CPU with its own attack profile, spawning in the wild
+    import json
+    custom_file = game.CUSTOM_FILE
+    game.CUSTOM_FILE = os.path.join(os.path.dirname(game.STATE_FILE), "_test_custom.json")
+    cpu = dict(game.md_by_logical("CPU_DATA")["ToyBonnie"], Logical="Custom_Test_cpu", AttackProfile="Custom_Test_cpu",
+               SpawnByStreak={"RankRangeByBestStreak": {"Min": 1, "Max": 1000},
+                              "RankRangeByCurrentStreak": {"Min": 0, "Max": 1000}})
+    attack = dict(next(a for a in game.md("ATTACK_DATA") if a["Logical"] == "ToyBonnie"), Logical="Custom_Test_cpu")
+    with open(game.CUSTOM_FILE, "w", encoding="utf-8") as f:
+        json.dump({"version": 1, "cpus": [cpu], "attacks": [attack], "loc": []}, f)
+    check("custom CPU and attack profile in master data",
+          game.md_version() == 801 and any(c["Logical"] == "Custom_Test_cpu" for c in game.md("CPU_DATA"))
+          and any(a["Logical"] == "Custom_Test_cpu" for a in game.md("ATTACK_DATA")))
+    check("custom CPU can spawn", "Custom_Test_cpu" in game.spawn_candidates(state()))
+    os.remove(game.CUSTOM_FILE)
+    game.CUSTOM_FILE = custom_file
+    game._md.clear()
+
     # Workshop
     s = state()
     mod = next(iter(s["ModInventory"]), "Map_Sub_02")

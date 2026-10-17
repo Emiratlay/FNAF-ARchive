@@ -78,6 +78,41 @@
     check("mod deleted", cu.mods.length === 0 && !st.ModInventory[mod.ModLogical], "mods=" + cu.mods.length);
     check("mod texts deleted", !cu.loc.some(function (l) { return l.ID.indexOf(mod.ModLogical) >= 0; }));
     check("version 3", cu.version === 3);
+
+    // 7) CPU: add an existing CPU
+    show("cpus");
+    var toyCard = $all("#main .card").filter(function (c) { return c.textContent.indexOf("Toy Bonnie") === 0; })[0];
+    toyCard.querySelectorAll(".stepper button")[1].click();
+    $("#saveBtn").click();
+    st = disk("save/state.json");
+    check("Toy Bonnie CPU added", st.CPUInventory.ToyBonnie === 1, JSON.stringify(st.CPUInventory));
+
+    // 8) Create a new CPU
+    btn("+ Create a new CPU").click();
+    var cin = $all("#main .card input"), csel = $all("#main .card select");
+    setVal(cin[0], "Shadow Toy Bonnie");
+    setVal(csel[0], "ToyBonnie");          // base CPU
+    setVal(csel[1], "Mangle"); // look
+    var chargeInput = cin[1];              // charge chance (%)
+    setVal(chargeInput, "60");
+    var wildCb = $all("#main .card input[type=checkbox]")[0];
+    wildCb.checked = true; wildCb.dispatchEvent(new Event("change"));
+    btn("Create").click();
+    cu = disk("custom/custom.json"); st = disk("save/state.json");
+    var ccpu = cu.cpus[cu.cpus.length - 1], catk = cu.attacks[cu.attacks.length - 1];
+    check("custom CPU written", ccpu && ccpu.PlushSuitRef === "Mangle" && ccpu.AttackProfile === ccpu.Logical, ccpu && ccpu.Logical);
+    check("custom attack profile", catk && catk.Logical === ccpu.Logical && catk.Pause.NextPhase.Charge.Chance === 0.6
+          && catk.Pause.NextPhase.Circle.Chance === 0.4, catk && JSON.stringify(catk.Pause.NextPhase));
+    check("wild spawning on", ccpu.SpawnByStreak.RankRangeByBestStreak.Min >= 1, JSON.stringify(ccpu.SpawnByStreak));
+    check("custom CPU in inventory", st.CPUInventory[ccpu.Logical] === 1);
+    check("custom CPU name", cu.loc.some(function (l) { return l.ID === ccpu.AnimatronicNames.Default && l.English === "Shadow Toy Bonnie"; }));
+
+    // 9) Delete the custom CPU
+    show("custom");
+    var cpuCard = $all("#main .card").filter(function (c) { return c.textContent.indexOf("Shadow Toy Bonnie") === 0; })[0];
+    cpuCard.querySelector("button").click();
+    cu = disk("custom/custom.json"); st = disk("save/state.json");
+    check("custom CPU deleted", !cu.cpus.length && !cu.attacks.length && !st.CPUInventory[ccpu.Logical]);
   } catch (e) {
     check("exception", false, e && e.stack);
   }

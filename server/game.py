@@ -25,7 +25,8 @@ MASTERDATA = os.path.join(HERE, "cdn", "8.0.0", "Masterdata", "800")
 CUSTOM_FILE = os.path.join(HERE, "custom", "custom.json")
 BASE_MD_VERSION = 800
 # custom.json section -> master data file it is appended to
-CUSTOM_SECTIONS = {"mods": "MODS_DATA", "plushsuits": "PLUSHSUIT_DATA", "cpus": "CPU_DATA", "loc": "LOC_DATA"}
+CUSTOM_SECTIONS = {"mods": "MODS_DATA", "plushsuits": "PLUSHSUIT_DATA", "cpus": "CPU_DATA",
+                   "attacks": "ATTACK_DATA", "loc": "LOC_DATA"}
 
 # Max wild animatronics at once, and spawn chance per REQUEST_ENTITIES poll (~every 11 s).
 MAX_WILD = 3
@@ -282,8 +283,11 @@ def roll_drops(cpu_id, chance_scale=1.0):
     drops = {"AnimatronicRewards": {}, "CPURewards": {}, "ModRewards": {}}
     if random.random() < (cfg.get("PlushSuitDropChance") or 0) * chance_scale:
         drops["AnimatronicRewards"][base] = {"PlushSuit": 1}
-    elif random.random() < (cfg.get("CPUDropChance") or 0) * chance_scale and base in md_by_logical("CPU_DATA"):
-        drops["CPURewards"][base] = 1
+    elif random.random() < (cfg.get("CPUDropChance") or 0) * chance_scale:
+        # Custom CPUs drop themselves; stock variants (Chica_Haywire) drop their main CPU (Chica).
+        cpu_reward = cpu_id if cpu_id.startswith("Custom_") else base
+        if cpu_reward in md_by_logical("CPU_DATA"):
+            drops["CPURewards"][cpu_reward] = 1
     elif random.random() < (cfg.get("ModDropChance") or 0) * chance_scale:
         mod = pick_mod(cpu.get("Rank"))
         if mod:
@@ -607,7 +611,13 @@ def cs_award_entity_rewards(s, p):
     sd = {}
     e = s["Entities"].pop(p.get("entityId"), None)
     if e:
-        sd.update(apply_rewards(s, e.get("rewardsV3") or {}))
+        rewards = copy.deepcopy(e.get("rewardsV3") or {})
+        parts = (rewards.get("CurrencyRewards") or {}).get("PARTS")
+        if parts and active_charges(s, "SalvageScanner") and use_charge(s, "SalvageScanner"):
+            bonus = ((device_def("SalvageScanner").get("Effects") or {}).get("SalvageScanner") or {}).get("PartsBonus", 1.25)
+            rewards["CurrencyRewards"]["PARTS"] = int(round(parts * bonus))
+            sd["PlayerDeviceData"] = s["PlayerDeviceData"]
+        sd.update(apply_rewards(s, rewards))
         progress(s, "DefeatAnimatronic", subtype=base_animatronic(e.get("animatronicConfigId", "")))
         finish_encounter(s, e)
     streak_win(s)
@@ -778,13 +788,20 @@ def cs_send_attack(s, p):
 
 
 def cs_express_delivery(s, p):
+    """Pay Faz-Coins to bring an animatronic on the map to you now. The client only sends the
+    request; it picks up the change from UpdateAnimatronicEntities in the response."""
     cost = int((md("CONFIG_DATA")[0].get("ExpressDelivery") or {}).get("CostFazCoins") or 50)
     eid = p.get("entityId")
-    for item in s["Incoming"]:
-        if item["entity"]["entityId"] == eid and spend(s, "FAZ_TOKENS", cost):
-            item["at"] = 0
-            item["entity"]["stateData"]["expressDelivery"] = True
-    return {"Currency": s["Currency"]}
+    entity = s["Entities"].get(eid)
+    incoming = next((i for i in s["Incoming"] if i["entity"]["entityId"] == eid), None)
+    if incoming:
+        entity = incoming["entity"]
+    if entity is None or not spend(s, "FAZ_TOKENS", cost):
+        return {"Currency": s["Currency"]}
+    entity["stateData"]["expressDelivery"] = True
+    if incoming:
+        incoming["at"] = 0
+    return {"Currency": s["Currency"], "UpdateAnimatronicEntities": {eid: entity}}
 
 
 # ---------------------------------------------------------------- Shadow Bonnie / remnant
@@ -812,9 +829,17 @@ def cs_spawn_motes(s, p):
     """Remnant nodes the game asked for (objectTypes): roll a node colour by SelectionWeight,
     "NoMote" means nothing spawns. Mote ids are remembered so collecting knows the colour."""
     types = essence_types()
+    emf = active_charges(s, "EMFMeter") > 0
+    bonus = ((device_def("EMFMeter").get("Effects") or {}).get("EMFMeter") or {}).get("RarityBonus", 1)
+    weights = []
+    for x in types.values():
+        w = x["NodeType"]["SelectionWeight"]
+        # An active EMF meter makes the rarer colours (worth more than 1 remnant) likelier.
+        per = ((x.get("MoteOverrides") or {}).get("SpawnBehavior") or {}).get("EssencePerMote") or 0
+        weights.append(w * (1 + bonus) if emf and per > 1 else w)
     nodes = []
     for category in p.get("objectTypes") or []:
-        t = random.choices(list(types.values()), weights=[x["NodeType"]["SelectionWeight"] for x in types.values()])[0]
+        t = random.choices(list(types.values()), weights=weights)[0]
         if not t["NodeType"].get("HasMote"):
             continue
         colour = t["NodeType"]["Logical"]
@@ -829,7 +854,11 @@ def cs_spawn_motes(s, p):
         s["Motes"] = dict(list(s["Motes"].items())[-200:])
     if not nodes:
         return {}
-    return {"EssencesToSpawn": nodes, "PlayerEssenceData": ESSENCE_STATE}
+    sd = {"EssencesToSpawn": nodes, "PlayerEssenceData": ESSENCE_STATE}
+    if emf:
+        use_charge(s, "EMFMeter")
+        sd["PlayerDeviceData"] = s["PlayerDeviceData"]
+    return sd
 
 
 def mote_value(s, mote_id):
@@ -877,8 +906,9 @@ def device_def(name):
 def cs_activate_device(s, p):
     name = p.get("deviceConfigId")
     dev = s["PlayerDeviceData"]
-    if dev["purchased"].get(name, 0) > 0:
-        dev["purchased"][name] -= 1
+    if name:
+        # The client only offers devices you own; trust it even if our count drifted.
+        dev["purchased"][name] = max(0, dev["purchased"].get(name, 0) - 1)
         d = device_def(name)
         exp = d.get("Expiration") or {}
         effects = d.get("Effects") or {}
@@ -896,6 +926,34 @@ def cs_activate_device(s, p):
             dev["active"].setdefault(name, {})[did] = {"deviceConfigId": name, "deviceId": did,
                                                         "deviceState": state, "deviceType": name}
     return {"PlayerDeviceData": dev}
+
+
+def active_charges(s, name):
+    """Remaining charges of an active device (0 if none)."""
+    return sum(int(d["deviceState"].get("scalar") or 0)
+               for d in s["PlayerDeviceData"]["active"].get(name, {}).values()
+               if d["deviceState"].get("expirationType") == "Charges")
+
+
+def use_charge(s, name):
+    """Consumes one charge of an active device; removes it when empty."""
+    for did, d in list(s["PlayerDeviceData"]["active"].get(name, {}).items()):
+        st = d["deviceState"]
+        if st.get("expirationType") == "Charges" and (st.get("scalar") or 0) > 0:
+            st["scalar"] -= 1
+            if st["scalar"] <= 0:
+                del s["PlayerDeviceData"]["active"][name][did]
+            return True
+    return False
+
+
+def expire_timed_devices(s):
+    now = time.time()
+    for devices in s["PlayerDeviceData"]["active"].values():
+        for did, d in list(devices.items()):
+            ts = d["deviceState"].get("expirationTimeStamp")
+            if d["deviceState"].get("expirationType") == "Time" and ts and ts < now:
+                del devices[did]
 
 
 def cs_expire_device(s, p):
@@ -1138,6 +1196,7 @@ def handle(path, req):
         s = load_state()
         s.setdefault("SessionToken", str(uuid.uuid4()))
         migrate(s)
+        expire_timed_devices(s)
         if path.startswith("/Client/LoginWith"):
             result = login(s)
         elif path == "/Client/PurchaseItem":
