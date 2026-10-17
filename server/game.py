@@ -32,6 +32,8 @@ CUSTOM_SECTIONS = {"mods": "MODS_DATA", "plushsuits": "PLUSHSUIT_DATA", "cpus": 
 
 # Max wild animatronics at once, and spawn chance per REQUEST_ENTITIES poll (~every 11 s).
 MAX_WILD = 3
+# Drop chances from CPU_DATA are multiplied by this (1.0 = original game).
+DROP_CHANCE_MULTIPLIER = 1.5
 SPAWN_CHANCE = 0.35
 FTUE_FAZ_TOKENS = 150
 
@@ -329,14 +331,16 @@ def roll_drops(cpu_id, chance_scale=1.0):
     cfg = (cpu.get("Rewards") or {}).get("WanderingAnimatronics") or {}
     base = base_animatronic(cpu_id)
     drops = {"AnimatronicRewards": {}, "CPURewards": {}, "ModRewards": {}}
-    if random.random() < (cfg.get("PlushSuitDropChance") or 0) * chance_scale:
+    scale = chance_scale * DROP_CHANCE_MULTIPLIER
+    # Each drop is rolled on its own, so a plush suit, its CPU and a mod can all drop together.
+    if random.random() < (cfg.get("PlushSuitDropChance") or 0) * scale:
         drops["AnimatronicRewards"][base] = {"PlushSuit": 1}
-    elif random.random() < (cfg.get("CPUDropChance") or 0) * chance_scale:
+    if random.random() < (cfg.get("CPUDropChance") or 0) * scale:
         # Custom CPUs drop themselves; stock variants (Chica_Haywire) drop their main CPU (Chica).
         cpu_reward = cpu_id if cpu_id.startswith("Custom_") else base
         if cpu_reward in md_by_logical("CPU_DATA"):
             drops["CPURewards"][cpu_reward] = 1
-    elif random.random() < (cfg.get("ModDropChance") or 0) * chance_scale:
+    if random.random() < (cfg.get("ModDropChance") or 0) * scale:
         mod = pick_mod(cpu.get("Rank"))
         if mod:
             drops["ModRewards"][mod] = 1
@@ -462,9 +466,29 @@ def spend(s, cur, amount):
 
 
 def streak_win(s):
+    """+1 streak. A new best streak pays PROGRESSION_DATA's BonusParts and unlocks
+    endoskeleton slots (streak 1, 5, 9, 13). Returns True if anything was unlocked/paid."""
     st = s["StreakData"]
     st["CurrentStreak"] += 1
-    st["BestStreak"] = max(st["BestStreak"], st["CurrentStreak"])
+    if st["CurrentStreak"] <= st["BestStreak"]:
+        return False
+    st["BestStreak"] = st["CurrentStreak"]
+    step = next((p for p in md("PROGRESSION_DATA") if p.get("MaxStreak") == st["BestStreak"]), {})
+    if step.get("BonusParts"):
+        add_currency(s, "PARTS", int(step["BonusParts"]))
+    sync_unlocked_slots(s)
+    return True
+
+
+def sync_unlocked_slots(s):
+    """Unlocked endo slots follow the best streak; purchased slots come on top."""
+    best = s["StreakData"]["BestStreak"]
+    unlocked = sum(1 for p in md("PROGRESSION_DATA")
+                   if p.get("EndoskeletonUnlock") == "Yes" and 0 < (p.get("MaxStreak") or 0) <= max(best, 1))
+    s["UnlockedEndoskeletonSlots"] = max(s.get("UnlockedEndoskeletonSlots", 1), unlocked)
+    want = s["UnlockedEndoskeletonSlots"] + s.get("PurchasedEndoskeletonSlots", 0)
+    while len(s["Warehouse"]) < want:
+        s["Warehouse"].append(new_slot())
 
 
 # ---------------------------------------------------------------- CloudScript functions
@@ -668,10 +692,10 @@ def cs_award_entity_rewards(s, p):
         sd.update(apply_rewards(s, rewards))
         progress(s, "DefeatAnimatronic", subtype=base_animatronic(e.get("animatronicConfigId", "")))
         finish_encounter(s, e)
-    streak_win(s)
+    new_best = streak_win(s)
     progress(s, "CurrentStreakLength", value=s["StreakData"]["CurrentStreak"])
     sd.update({"StreakData": s["StreakData"], "PlayerDailyChallengeData": daily(s), "Currency": s["Currency"]})
-    if any(k in sd for k in ("Inventory", "CPUInventory", "ModInventory")):
+    if new_best or any(k in sd for k in ("Inventory", "CPUInventory", "ModInventory")):
         sd["WarehouseDataV2"] = s["Warehouse"]
     return sd
 
@@ -761,38 +785,102 @@ def cs_start_scavenge(s, p):
     return {"WarehouseDataV2": s["Warehouse"], "NewAnimatronicEntities": {e["entityId"]: e}}
 
 
-def scavenge_rewards(appointment_id):
+SCAVENGE_MAX_STARS = {"Scavenge30": 1, "Scavenge60": 2, "Scavenge120": 2, "Scavenge240": 3}
+# Common reward kind: mod chip, Faz-Coins or a device/lure from the appointment's loot table.
+SCAVENGE_COMMON_KINDS = (("mod", 45), ("coins", 25), ("device", 30))
+
+
+def endo_mod_multipliers(endo):
+    """Multipliers from salvage mod chips equipped on the endo (CommonSalvage / RareSalvage)."""
+    mods = md_by_logical_key("MODS_DATA", "ModLogical")
+    mult = {}
+    for mod_id in (endo or {}).get("mods") or []:
+        ef = (mods.get(mod_id) or {}).get("Effects") or {}
+        for i in (1, 2, 3):
+            t, v = ef.get("EffectType_%d" % i), ef.get("EffectMag_%d" % i)
+            if t and isinstance(v, (int, float)):
+                mult[t] = mult.get(t, 1.0) * v
+    return mult
+
+
+def pick_mod_stars(max_stars, min_stars=1):
+    pool = [m for m in md("MODS_DATA") if (m.get("DropWeight") or 0) > 0
+            and min_stars <= (m.get("Stars") or 1) <= max_stars]
+    if not pool:
+        return None
+    return random.choices(pool, weights=[m["DropWeight"] for m in pool])[0]["ModLogical"]
+
+
+def loot_table(table_id):
+    return [r for r in md("DAILY_CHALLENGE_REWARDS_DATA") if r.get("LootTableId") == table_id]
+
+
+def scavenge_rewards(appointment_id, endo=None):
+    """Scavenge loot from SCAVENGE_APPOINTMENT_DATA: parts, one common reward (a mod chip whose
+    stars grow with the trip length, Faz-Coins or a device from the loot table), a rare reward
+    (a character CPU or a 3-star mod) and a plush suit chance. Salvage mods on the endo apply.
+    Returns (rewards for the reward screen, devices granted, wear damage)."""
     a = md_by_logical("SCAVENGE_APPOINTMENT_DATA").get(appointment_id) or \
         md("CONFIG_DATA")[0].get("Scavenging") or {}
+    mult = endo_mod_multipliers(endo)
     r = {"ModRewards": {}, "AnimatronicRewards": {}, "CurrencyRewards": {}, "CPURewards": {}}
-    parts = rand_range(a.get("Parts"), 0)
-    if parts:
-        r["CurrencyRewards"]["PARTS"] = parts
-    if random.random() < (a.get("CommonRewardChance") or 0):
-        mod = pick_mod(2)
-        if mod:
-            r["ModRewards"][mod] = 1
-    if random.random() < (a.get("RareRewardChance") or 0):
-        mod = pick_mod(10)
-        if mod:
-            r["ModRewards"][mod] = r["ModRewards"].get(mod, 0) + 1
-    if random.random() < (a.get("PlushSuitChance") or 0):
+    devices = {}
+    parts_range = a.get("Parts") or {"Min": 10, "Max": 20}
+    lo = int(round(parts_range.get("Min", 10) * mult.get("PartsMin", 1)))
+    hi = max(lo, int(round(parts_range.get("Max", lo) * mult.get("PartsMax", 1))))
+    r["CurrencyRewards"]["PARTS"] = random.randint(lo, hi)
+
+    if random.random() < (a.get("CommonRewardChance") or 0) * mult.get("CommonRewardChance", 1):
+        kinds = [k for k, _ in SCAVENGE_COMMON_KINDS]
+        kind = random.choices(kinds, weights=[w for _, w in SCAVENGE_COMMON_KINDS])[0]
+        table = loot_table(a.get("LootStructureId") or "BonnieCrate")
+        if kind == "mod":
+            mod = pick_mod_stars(SCAVENGE_MAX_STARS.get(appointment_id, 1))
+            if mod:
+                r["ModRewards"][mod] = 1
+        else:
+            want = "Currency" if kind == "coins" else "Device"
+            pool = [x for x in table if (x.get("Item1") or {}).get("RewardType") == want]
+            if pool:
+                item = random.choices(pool, weights=[x.get("Weight") or 1 for x in pool])[0]["Item1"]
+                if kind == "coins":
+                    r["CurrencyRewards"]["FAZ_TOKENS"] = int(item.get("Quantity") or 10)
+                else:
+                    sub = item["RewardSubtype"]
+                    devices[sub] = devices.get(sub, 0) + int(item.get("Quantity") or 1)
+
+    if random.random() < (a.get("RareRewardChance") or 0) * mult.get("RareRewardChance", 1):
+        cpus = [c["Logical"] for c in md("CPU_DATA") if "_" not in c["Logical"] and c.get("Rank")
+                and (c.get("Status") or {}).get("LiveState") == "State_Active" and c["Logical"] != "BareEndo"]
+        if cpus and random.random() < 0.5:
+            r["CPURewards"][random.choice(cpus)] = 1
+        else:
+            mod = pick_mod_stars(3, 3)
+            if mod:
+                r["ModRewards"][mod] = r["ModRewards"].get(mod, 0) + 1
+
+    if random.random() < (a.get("PlushSuitChance") or 0) * mult.get("PlushSuitChance", 1):
         suits = [x["Logical"] for x in md("PLUSHSUIT_DATA") if x.get("PlayerAcquirable")]
         if suits:
             r["AnimatronicRewards"][random.choice(suits)] = {"PlushSuit": 1}
     wear = rand_range(a.get("WearAndTearDamage"), 0) if random.random() < (a.get("WearAndTearChance") or 0) else 0
-    return r, wear
+    return r, devices, wear
 
 
 def cs_collect_scavenge(s, p):
     slot = slot_at(s, p)
-    rewards, wear = scavenge_rewards(slot.get("appointmentId"))
+    rewards, devices, wear = scavenge_rewards(slot.get("appointmentId"), slot.get("endoskeleton"))
     eid = slot.get("entityId", "")
     s["Entities"].pop(eid, None)
     free_slot(slot, wear_loss=wear)
     sd = apply_rewards(s, rewards)
+    # The reward screen cannot show devices; they still go to your inventory.
+    for name, n in devices.items():
+        give_device(s, name, n)
+    if devices:
+        sd["PlayerDeviceData"] = s["PlayerDeviceData"]
     sd.update({"ScavengeRecall": [eid], "WarehouseDataV2": s["Warehouse"], "RewardsV2": rewards,
-               "ModInventory": s["ModInventory"]})
+               "ModInventory": s["ModInventory"], "Currency": s["Currency"]})
     return sd
 
 
@@ -847,9 +935,14 @@ def cs_express_delivery(s, p):
     if entity is None or not spend(s, "FAZ_TOKENS", cost):
         return {"Currency": s["Currency"]}
     entity["stateData"]["expressDelivery"] = True
+    # Skip the trip: anything still on its way (far away, stalking, travelling) starts approaching now.
+    if entity["stateData"].get("animatronicState", 0) in (0, 1, 8, 9, 14):
+        entity["stateData"]["animatronicState"] = 2   # ApproachingPlayer
     if incoming:
         incoming["at"] = 0
-    return {"Currency": s["Currency"], "UpdateAnimatronicEntities": {eid: entity}}
+    # The client reads UpdateAnimatronicEntities as a LIST of entities and applies one only when its
+    # state or expressDelivery flag changed (AnimatronicEntityDomain.OnEntityUpdated).
+    return {"Currency": s["Currency"], "UpdateAnimatronicEntities": [entity]}
 
 
 # ---------------------------------------------------------------- Shadow Bonnie / remnant
@@ -977,7 +1070,8 @@ def cs_activate_device(s, p):
             did = str(now_ms())
             state = {"expirationTimeStamp": None, "expirationType": "Charges", "scalar": exp.get("Count", 1)}
             if "Seconds" in exp:
-                state = {"expirationTimeStamp": int(time.time() + exp["Seconds"]), "expirationType": "Time",
+                # DeviceEntry.IsExpired compares against server time * 1000: milliseconds.
+                state = {"expirationTimeStamp": int((time.time() + exp["Seconds"]) * 1000), "expirationType": "Time",
                          "scalar": 1}
             dev["active"].setdefault(name, {})[did] = {"deviceConfigId": name, "deviceId": did,
                                                         "deviceState": state, "deviceType": name}
@@ -1004,12 +1098,15 @@ def use_charge(s, name):
 
 
 def expire_timed_devices(s):
-    now = time.time()
+    now_ms_ = time.time() * 1000
     for devices in s["PlayerDeviceData"]["active"].values():
         for did, d in list(devices.items()):
             ts = d["deviceState"].get("expirationTimeStamp")
-            if d["deviceState"].get("expirationType") == "Time" and ts and ts < now:
-                del devices[did]
+            if d["deviceState"].get("expirationType") == "Time" and ts:
+                if ts < 10 ** 11:          # saved by an older version in seconds
+                    ts = d["deviceState"]["expirationTimeStamp"] = ts * 1000
+                if ts < now_ms_:
+                    del devices[did]
 
 
 def cs_expire_device(s, p):

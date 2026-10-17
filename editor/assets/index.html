@@ -118,7 +118,7 @@ function effName(t) { return EFFECT_TR[t] || t; }
 // ------------------------------------------------------------------ data
 var D = {};   // base: mods, cats, suits, loc
 var state = null, custom = null;
-var dirtyState = false, dirtyCustom = false, dirtyWorld = false, dirtyDevices = false;
+var dirtyState = false, dirtyCustom = false, dirtyWorld = false, dirtyDevices = false, dirtyActive = false;
 
 function emptyCustom() { return { version: 0, mods: [], plushsuits: [], cpus: [], attacks: [], loc: [], meta: {} }; }
 
@@ -246,6 +246,20 @@ function renderMoney(root) {
   // Devices: lures (incl. Shadow Bonnie), EMF Meter, Salvage Scanner...
   root.appendChild(el("h2", { text: "Devices" }));
   root.appendChild(el("div", { class: "hint", text: "Using a lure in the game brings that character in ~10 seconds. The Shadow Bonnie Lure gets harder after every win." }));
+  // Switches off devices that are still running (Radio Jammer, Transponder, EMF Meter...).
+  var activeNames = Object.keys(state.PlayerDeviceData.active || {}).filter(function (k) {
+    return Object.keys(state.PlayerDeviceData.active[k] || {}).length > 0;
+  });
+  root.appendChild(el("div", { class: "card row" }, [
+    el("div", { class: "grow" }, [
+      el("div", { class: "name", text: "Active devices" }),
+      el("div", { class: "sub", text: activeNames.length ? activeNames.join(", ") : "No device is running." })
+    ]),
+    el("button", { class: "btn ghost", text: "Switch off", onclick: function () {
+      Object.keys(state.PlayerDeviceData.active || {}).forEach(function (k) { state.PlayerDeviceData.active[k] = {}; });
+      dirtyActive = true; markDirty("state"); toast("Running devices switch off when you save.", "ok");
+    } })
+  ]));
   // After a save, state is a new object: always read the current one.
   var owned = function () { return state.PlayerDeviceData.purchased; };
   D.devices.forEach(function (d) {
@@ -715,10 +729,14 @@ function save() {
         if (!fresh.PlayerDeviceData) fresh.PlayerDeviceData = { active: {}, pending: [], purchased: {} };
         fresh.PlayerDeviceData.purchased = state.PlayerDeviceData.purchased;
       }
+      if (dirtyActive) {
+        if (!fresh.PlayerDeviceData) fresh.PlayerDeviceData = { active: {}, pending: [], purchased: {} };
+        Object.keys(fresh.PlayerDeviceData.active || {}).forEach(function (k) { fresh.PlayerDeviceData.active[k] = {}; });
+      }
       writeJson(STATE, fresh);
       state = fresh;
     }
-    dirtyState = dirtyCustom = dirtyWorld = dirtyDevices = false;
+    dirtyState = dirtyCustom = dirtyWorld = dirtyDevices = dirtyActive = false;
     document.getElementById("savebar").className = "savebar";
     document.getElementById("status").textContent = "Save: " + Android.basePath() + " · custom content version " + custom.version;
     toast("Saved. Reopen the game to see it.", "ok");

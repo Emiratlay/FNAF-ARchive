@@ -60,13 +60,17 @@ Everything below runs offline. 40 of the game's CloudScript calls are emulated:
 - **Login, tutorial, inbox:** inbox messages, remnant milestone messages.
 - **Encounters:**
   - wild spawns by win streak (Basic → Haywire → Insane…);
-  - winning pays parts and the CPU, plush suit and mod **drops** decided at spawn;
+  - winning pays parts and the CPU, plush suit and mod **drops** decided at spawn (each rolled separately);
+  - a new best streak pays bonus parts and unlocks endo slots at streaks 5, 9 and 13;
   - losing costs remnant.
 - **Workshop:**
   - equip CPUs, plush suits, mod chips and remnant;
   - repair wear and tear;
   - sell mod chips.
-- **Scavenging:** send out, collect rewards when it returns, recall.
+- **Scavenging:**
+  - send out, collect, recall;
+  - loot: parts plus a mod chip (stars grow with trip length), Faz-Coins or a device/lure, with a chance of a CPU or plush suit;
+  - salvage mod chips on the endo improve the loot.
 - **Sending animatronics:** the friends list contains **"Me (offline)"**. Send your endo to it and it comes back to attack you with your CPU. Recall works too.
 - **Express delivery:** pay 50 Faz-Coins to bring an animatronic on the map to you now.
 - **Store:**
@@ -76,7 +80,8 @@ Everything below runs offline. 40 of the game's CloudScript calls are emulated:
   - the Salvage Scanner gives +25% parts on your next win;
   - the EMF Meter makes rare remnant colours likelier for 10 uses;
   - lures bring the lured animatronic;
-  - timed devices such as the Radio Jammer expire on schedule.
+  - timed devices expire on schedule: Radio Jammer 2 hours, Transponder 3 days;
+  - the editor can switch them off early.
 - **Remnant:** server-side remnant nodes; the colour decides the amount.
 - **Shadow Bonnie:**
   - The **Shadow Bonnie Lure** is sold in the store (500 Faz-Coins for 3) and can be added in the editor.

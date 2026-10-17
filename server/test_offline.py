@@ -98,6 +98,19 @@ def main():
     d = cs("ACTIVATE_DEVICE", deviceConfigId="SalvageScanner")["PlayerDeviceData"]
     check("salvage scanner active", d["active"]["SalvageScanner"])
     did = list(d["active"]["SalvageScanner"])[0]
+    s = state()
+    s["PlayerDeviceData"]["purchased"]["FriendOrFoeTransponder"] = 1
+    game.save_state(s)
+    t = cs("ACTIVATE_DEVICE", deviceConfigId="FriendOrFoeTransponder")["PlayerDeviceData"]["active"]["FriendOrFoeTransponder"]
+    ts = list(t.values())[0]["deviceState"]["expirationTimeStamp"]
+    import time as _t
+    check("transponder expiry in milliseconds (3 days)", abs(ts - (_t.time() + 259200) * 1000) < 60000, ts)
+    s = state()
+    for v in s["PlayerDeviceData"]["active"]["FriendOrFoeTransponder"].values():
+        v["deviceState"]["expirationTimeStamp"] = (_t.time() - 5) * 1000
+    game.save_state(s)
+    cs("GET_PLAYER_DATA")
+    check("expired transponder is removed", not state()["PlayerDeviceData"]["active"]["FriendOrFoeTransponder"])
     check("device expired", not cs("EXPIRE_DEVICE", activeDeviceId=did)["PlayerDeviceData"]["active"]["SalvageScanner"])
     cs("ACTIVATE_DEVICE", deviceConfigId="Lure_Foxy")
     s = state()
@@ -108,19 +121,48 @@ def main():
     check("lured Foxy arrives", any(e["animatronicConfigId"] == "Foxy" and e["originData"]["animatronicOrigin"] == 1
                                     for e in new.values()))
 
+    # Radio jammer: 2 hours, millisecond expiry
+    import time as _tj
+    s = state()
+    s["PlayerDeviceData"]["purchased"]["RadioJammer"] = 1
+    game.save_state(s)
+    j = cs("ACTIVATE_DEVICE", deviceConfigId="RadioJammer")["PlayerDeviceData"]["active"]["RadioJammer"]
+    jts = list(j.values())[0]["deviceState"]["expirationTimeStamp"]
+    check("radio jammer lasts 2 hours (ms)", abs(jts - (_tj.time() + 7200) * 1000) < 60000, jts)
+    s = state()
+    s["PlayerDeviceData"]["active"]["RadioJammer"] = {}
+    game.save_state(s)
+
+    # Independent drops: over many spawns every drop kind appears, sometimes together
+    import collections as _c
+    kinds = _c.Counter()
+    for _ in range(3000):
+        d = game.roll_drops("FreddyFazbear_Insane")
+        n = sum(1 for k in ("AnimatronicRewards", "CPURewards", "ModRewards") if d[k])
+        for k in ("AnimatronicRewards", "CPURewards", "ModRewards"):
+            if d[k]:
+                kinds[k] += 1
+        if n >= 2:
+            kinds["together"] += 1
+    check("drops are independent (suit, CPU, mod, combined)", all(kinds[k] for k in
+          ("AnimatronicRewards", "CPURewards", "ModRewards", "together")), dict(kinds))
+
     # Express delivery of an animatronic on the map
     s = state()
     s["Currency"]["FAZ_TOKENS"] = 100
     game.save_state(s)
     on_map = next(eid for eid, e in state()["Entities"].items() if e["originData"]["animatronicOrigin"] in (0, 1))
     r = cs("EXPRESS_DELIVERY", entityId=on_map)
-    check("express delivery updates the animatronic",
-          r.get("UpdateAnimatronicEntities", {}).get(on_map, {}).get("stateData", {}).get("expressDelivery") is True
-          and r["Currency"]["FAZ_TOKENS"] == 50, r["Currency"])
+    upd = r.get("UpdateAnimatronicEntities")
+    check("express delivery: list with the updated animatronic",
+          isinstance(upd, list) and upd and upd[0]["entityId"] == on_map
+          and upd[0]["stateData"]["expressDelivery"] is True and upd[0]["stateData"]["animatronicState"] == 2
+          and r["Currency"]["FAZ_TOKENS"] == 50, (r["Currency"], upd and upd[0]["stateData"]))
 
     # Salvage scanner: parts bonus on a win, uses a charge
     s = state()
     s["PlayerDeviceData"]["purchased"]["SalvageScanner"] = 1
+    s["StreakData"] = {"CurrentStreak": 0, "BestStreak": 50}   # no new-best bonus in this check
     game.save_state(s)
     cs("ACTIVATE_DEVICE", deviceConfigId="SalvageScanner")
     s = state()
@@ -160,6 +202,30 @@ def main():
     game.CUSTOM_FILE = custom_file
     game._md.clear()
 
+    # Streak progression: bonus parts and endo slots
+    s = state()
+    s["StreakData"] = {"CurrentStreak": 3, "BestStreak": 3}
+    s["UnlockedEndoskeletonSlots"] = 1
+    game.save_state(s)
+    before_parts = state()["Currency"]["PARTS"]
+    eid = next(iter(state()["Entities"]), None)
+    if eid is None:
+        e = game.make_entity(state(), "Chica_Basic", origin=0)
+        s = state(); s["Entities"][e["entityId"]] = e; game.save_state(s); eid = e["entityId"]
+    reward_parts = (state()["Entities"][eid]["rewardsV3"].get("CurrencyRewards") or {}).get("PARTS", 0)
+    w = cs("AWARD_ENTITY_REWARDS_V2", entityId=eid)
+    check("new best streak 4 pays bonus parts (25)", w["Currency"]["PARTS"] - before_parts >= 25 + reward_parts - 1,
+          (w["Currency"]["PARTS"] - before_parts, reward_parts))
+    s = state()
+    s["StreakData"] = {"CurrentStreak": 4, "BestStreak": 4}
+    game.save_state(s)
+    e = game.make_entity(state(), "Chica_Basic", origin=0)
+    s = state(); s["Entities"][e["entityId"]] = e; game.save_state(s)
+    w = cs("AWARD_ENTITY_REWARDS_V2", entityId=e["entityId"])
+    check("streak 5 unlocks a second endo slot", state()["UnlockedEndoskeletonSlots"] == 2
+          and len(w["WarehouseDataV2"]) >= 2 + state().get("PurchasedEndoskeletonSlots", 0) - 0,
+          (state()["UnlockedEndoskeletonSlots"], len(w["WarehouseDataV2"])))
+
     # Workshop
     s = state()
     mod = next(iter(s["ModInventory"]), "Map_Sub_02")
@@ -180,6 +246,32 @@ def main():
     check("scavenge start on slot 2", w["WarehouseDataV2"][1]["status"] == "ScavengeAppointment")
     c = cs("COLLECT_SCAVENGE_APPOINTMENT", slotId=1)
     check("scavenge collect", c["WarehouseDataV2"][1]["status"] == "Available" and "RewardsV2" in c, c["RewardsV2"])
+    # Scavenge loot variety over many trips
+    import collections
+    seen = collections.Counter()
+    stars = collections.Counter()
+    mods = game.md_by_logical_key("MODS_DATA", "ModLogical")
+    for appt in ("Scavenge30", "Scavenge240"):
+        for _ in range(150):
+            rw, devs, _w = game.scavenge_rewards(appt)
+            if rw["CurrencyRewards"].get("PARTS"):
+                seen["parts"] += 1
+            if rw["CurrencyRewards"].get("FAZ_TOKENS"):
+                seen["faz-coins"] += 1
+            if devs:
+                seen["device"] += 1
+            if rw["CPURewards"]:
+                seen["cpu"] += 1
+            for m in rw["ModRewards"]:
+                seen["mod"] += 1
+                stars[(appt, mods[m]["Stars"])] += 1
+    check("scavenge gives parts, mods, Faz-Coins and devices",
+          seen["parts"] == 300 and seen["mod"] and seen["faz-coins"] and seen["device"], dict(seen))
+    low = sum(n for (a, st), n in stars.items() if a == "Scavenge30" and st == 1)
+    high30 = sum(n for (a, st), n in stars.items() if a == "Scavenge30" and st > 1)
+    check("longer scavenges give higher-star mods",
+          low > high30 * 5 and any(st > 1 for (a, st) in stars if a == "Scavenge240"), dict(stars))
+
     cs("START_SCAVENGE_APPOINTMENT", slotId=1, appointmentId="Scavenge30")
     r = cs("RECALL_SCAVENGE_APPOINTMENT", slotId=1)
     check("scavenge recall", r["WarehouseDataV2"][1]["status"] == "Available" and r["ScavengeRecall"][0])

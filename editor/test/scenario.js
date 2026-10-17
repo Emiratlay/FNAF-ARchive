@@ -26,6 +26,13 @@
     st = disk("save/state.json");
     check("Shadow Bonnie Lure added", st.PlayerDeviceData.purchased.Lure_ShadowBonnie === 2, JSON.stringify(st.PlayerDeviceData.purchased));
 
+    // 1c) Switch off active devices
+    var activeCard = $all("#main .card").filter(function (c) { return c.textContent.indexOf("Active devices") === 0; })[0];
+    activeCard.querySelector("button").click();
+    $("#saveBtn").click();
+    st = disk("save/state.json");
+    check("active devices switched off", Object.keys(st.PlayerDeviceData.active).every(function (k) { return !Object.keys(st.PlayerDeviceData.active[k]).length; }));
+
     // 2) Add an existing mod chip
     show("mods");
     var firstPlus = $all("#main .stepper button")[1];

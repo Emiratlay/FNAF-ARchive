@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.3
+
+### Server
+- **Express delivery fixed.** The game reads `UpdateAnimatronicEntities` as a *list*. It also applies an update only when the animatronic's state changes. The update is now a list, and the animatronic switches to "approaching" so it actually comes to you.
+- **Radio Jammer and Friend-or-Foe Transponder fixed.** `DeviceEntry.IsExpired` compares expiry times in **milliseconds**, but they were sent in seconds. Timed devices now last exactly as the game data says: Jammer 2 hours, Transponder 3 days. Old saves are converted automatically.
+- **Scavenging gives real loot.** Every trip gives parts. You also get one common reward: a mod chip, Faz-Coins or a device/lure from the game's loot table. Mod stars grow with trip length (30 min 1★, 1–2 h up to 2★, 4 h up to 3★). There is also a rare reward (a character CPU or a 3★ mod) and a plush suit chance. Salvage mod chips equipped on the endo now change the parts, reward and plush suit chances.
+- **Encounter drops:**
+  - Plush suit, CPU and mod drops are now rolled independently, so several can drop at once.
+  - The drop chances from the game data are multiplied by 1.5 (`DROP_CHANCE_MULTIPLIER`).
+  - Note: 12–13 parts is the game's real reward for Basic Freddy and Chica. Higher-streak animatronics pay much more.
+- **Streak progression (`PROGRESSION_DATA`):**
+  - A new best streak pays bonus parts: 13, 25, 45, 73…
+  - Streaks 5, 9 and 13 unlock extra endoskeleton slots.
+
+### Editor
+- **Active devices → Switch off** stops any running device (Radio Jammer, Transponder, EMF Meter…) on the next save.
+
+
 ## v1.2
 
 ### Server
