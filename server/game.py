@@ -25,13 +25,16 @@ MASTERDATA = os.path.join(HERE, "cdn", "8.0.0", "Masterdata", "800")
 CUSTOM_FILE = os.path.join(HERE, "custom", "custom.json")
 # Served master data version. Raised above the stock 800 so phones that cached the stock data
 # re-download it with the built-in additions below.
-BASE_MD_VERSION = 2000
+BASE_MD_VERSION = 3000
 # custom.json section -> master data file it is appended to
 CUSTOM_SECTIONS = {"mods": "MODS_DATA", "plushsuits": "PLUSHSUIT_DATA", "cpus": "CPU_DATA",
                    "attacks": "ATTACK_DATA", "loc": "LOC_DATA"}
 
 # Max wild animatronics at once, and spawn chance per REQUEST_ENTITIES poll (~every 11 s).
 MAX_WILD = 3
+# Share of wild spawns picked from the whole roster instead of the streak-based list, so the
+# map is not only Basic Freddy/Chica/Endo at a low streak. 0 = original game.
+WILD_VARIETY_CHANCE = 0.35
 # Drop chances from CPU_DATA are multiplied by this (1.0 = original game).
 DROP_CHANCE_MULTIPLIER = 1.5
 SPAWN_CHANCE = 0.35
@@ -107,10 +110,33 @@ SB_LURE_DESC = "Activating the lure calls Shadow Bonnie to you. Each win makes t
 SELF_FRIEND_ID = "0FF11E5E1F000000"
 
 
+MOVEMENT_KEYS = ("SpeedMPH", "MapNodes", "StalkingTimers")
+
+
+def patch_stock(name, entries):
+    """Fixes to stock entries for offline play. Shadow Bonnie's CPUs have no movement data
+    (the live server spawned it right next to you), so a delivered Shadow Bonnie could never
+    walk to the player. Give it Bonnie's movement settings."""
+    if name != "CPU_DATA":
+        return entries
+    donor = next((c for c in entries if c.get("Logical") == "Bonnie"), None)
+    if not donor:
+        return entries
+    out = []
+    for c in entries:
+        if c.get("Logical", "").startswith("ShadowBonnie_") and any(k not in c for k in MOVEMENT_KEYS):
+            c = copy.deepcopy(c)
+            for k in MOVEMENT_KEYS:
+                if k not in c and k in donor:
+                    c[k] = copy.deepcopy(donor[k])
+        out.append(c)
+    return out
+
+
 def md(name):
     ver = md_version()
     if _md.get(name, (None,))[0] != ver:
-        entries = _stock(name)
+        entries = patch_stock(name, _stock(name))
         entries = entries + builtin(name, entries)
         c = custom()
         for section, file_name in CUSTOM_SECTIONS.items():
@@ -357,6 +383,7 @@ def make_entity(s, cpu_id, origin, plush=None, wear=None):
     nodes = cpu.get("MapNodes") or {}
     ts = now_ms()
     parts = rand_range(rewards.get("Parts"), 0)
+    essence = rand_range(rewards.get("Essence"), 0)
     drops = roll_drops(cpu_id) if origin in (0, 1, 2) else {"AnimatronicRewards": {}, "CPURewards": {}, "ModRewards": {}}
     return {
         "ScavengingData": {"NextPoint": {"name": "", "id": "", "type": 0}, "TimeStamp": 0},
@@ -374,7 +401,8 @@ def make_entity(s, cpu_id, origin, plush=None, wear=None):
                           "startNode": {"id": "", "name": "", "type": 0}, "timeElapsed": 0},
         "originData": {"animatronicOrigin": origin},
         "rewardsV3": {"AnimatronicRewards": drops["AnimatronicRewards"], "CPURewards": drops["CPURewards"],
-                      "CurrencyRewards": {"PARTS": parts} if parts else {},
+                      "CurrencyRewards": dict(({"PARTS": parts} if parts else {}),
+                                              **({"ESSENCE": essence} if essence else {})),
                       "EssenceOnLose": rand_range(rewards.get("EssenceOnLose"), 0) if origin in (0, 1) else 0,
                       "ModRewards": drops["ModRewards"]},
         "owner": s["PlayFabId"],
@@ -409,6 +437,22 @@ def spawn_candidates(s):
         if in_range(max(best, 1), sbs.get("RankRangeByBestStreak") or {}, 1) and \
                 in_range(cur, sbs.get("RankRangeByCurrentStreak") or {}, 0):
             out.append(cpu["Logical"])
+    return out
+
+
+def variety_roster():
+    """Every animatronic that can roam the map: main CPUs and skins (no _Basic/_Insane variants),
+    active, with map movement and wild rewards. Weighted towards low ranks."""
+    out = []
+    for cpu in md("CPU_DATA"):
+        lg = cpu["Logical"]
+        if "_" in lg or lg.startswith("ShadowBonnie") or lg.startswith("Custom_"):
+            continue
+        if (cpu.get("Status") or {}).get("LiveState") != "State_Active":
+            continue
+        if not (cpu.get("Rewards") or {}).get("WanderingAnimatronics") or "MapNodes" not in cpu:
+            continue
+        out.append((lg, 1.0 / max(1, cpu.get("Rank") or 1)))
     return out
 
 
@@ -641,8 +685,13 @@ def cs_request_entities(s, p):
     new = deliver_incoming(s)
     if spawns_allowed(s) and wild_count(s) < MAX_WILD and random.random() < SPAWN_CHANCE:
         cands = spawn_candidates(s)
-        if cands:
-            e = make_entity(s, random.choice(cands), origin=0)
+        roster = variety_roster()
+        if roster and (not cands or random.random() < WILD_VARIETY_CHANCE):
+            pick = random.choices([r[0] for r in roster], weights=[r[1] for r in roster])[0]
+        else:
+            pick = random.choice(cands) if cands else None
+        if pick:
+            e = make_entity(s, pick, origin=0)
             s["Entities"][e["entityId"]] = e
             new[e["entityId"]] = e
     if not new:

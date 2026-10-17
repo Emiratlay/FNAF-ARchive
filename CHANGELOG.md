@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.4
+
+### Server
+- **Shadow Bonnie arrives now.** Its CPU entries in the game data have no map movement (speed, path nodes, stalking timers), because the live server spawned it right next to you. A delivered Shadow Bonnie therefore never reached the player, whether it came from the lure or from the remnant threat. The served master data now gives the `ShadowBonnie_*` CPUs Bonnie's movement settings.
+- Shadow Bonnie pays **remnant** (its real reward in the game data) instead of parts.
+- **More variety on the map.** 35% of wild spawns (`WILD_VARIETY_CHANCE`) now come from the whole roster instead of only the streak-based list: Bonnie, Foxy, Balloon Boy, Baby, Springtrap, the Toys, Mangle, Ballora, Frostbear and the skins. Higher ranks are rarer. Basic Freddy, Chica and Endo stay the most common at a low streak.
+- The served master data version is now 3000+, so phones re-download it once.
+
+
 ## v1.3
 
 ### Server

@@ -59,7 +59,7 @@ Everything below runs offline. 40 of the game's CloudScript calls are emulated:
 
 - **Login, tutorial, inbox:** inbox messages, remnant milestone messages.
 - **Encounters:**
-  - wild spawns by win streak (Basic → Haywire → Insane…);
+  - wild spawns by win streak (Basic → Haywire → Insane…), plus a 35% chance of any animatronic from the whole roster (Toys, Mangle, Ballora, Springtrap, skins…);
   - winning pays parts and the CPU, plush suit and mod **drops** decided at spawn (each rolled separately);
   - a new best streak pays bonus parts and unlocks endo slots at streaks 5, 9 and 13;
   - losing costs remnant.

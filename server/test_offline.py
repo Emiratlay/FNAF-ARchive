@@ -327,6 +327,32 @@ def main():
     s["Incoming"] = []
     game.save_state(s)
 
+    # Shadow Bonnie can actually walk to you and pays remnant
+    sbcpu = game.md_by_logical("CPU_DATA")["ShadowBonnie_Easy"]
+    check("Shadow Bonnie CPU has movement data", all(k in sbcpu for k in ("SpeedMPH", "MapNodes", "StalkingTimers")))
+    sbe = game.make_entity(state(), "ShadowBonnie_Hard", origin=2, plush="ShadowBonnie")
+    check("Shadow Bonnie pays remnant", (sbe["rewardsV3"]["CurrencyRewards"] or {}).get("ESSENCE", 0) >= 8,
+          sbe["rewardsV3"]["CurrencyRewards"])
+
+    # Map variety: at a low streak more than Basic Freddy/Chica/Endo show up
+    import collections as _cv
+    s = state()
+    s["StreakData"] = {"CurrentStreak": 0, "BestStreak": 1}
+    s["PlayerFeatureFlags"] = {"flags": []}
+    game.save_state(s)
+    seen_kinds = _cv.Counter()
+    old_chance, game.SPAWN_CHANCE = game.SPAWN_CHANCE, 1.0
+    for _ in range(300):
+        s = state()
+        s["Entities"] = {}
+        game.save_state(s)
+        for e in (cs("REQUEST_ENTITIES_V8", uiLocation="map").get("NewAnimatronicEntities") or {}).values():
+            seen_kinds[e["animatronicConfigId"].split("_")[0]] += 1
+    game.SPAWN_CHANCE = old_chance
+    check("map shows many different animatronics at a low streak", len(seen_kinds) >= 8, dict(seen_kinds))
+    check("Basic ones still most common", seen_kinds.most_common(1)[0][0] in ("FreddyFazbear", "Chica", "BareEndo"),
+          seen_kinds.most_common(3))
+
     # Shadow Bonnie (remnant threat path)
     sb = list(cs("START_ESSENCE_ENCOUNTER_V3")["NewAnimatronicEntities"].values())[0]
     check("Shadow Bonnie encounter (Medium after one Easy win)", sb["animatronicConfigId"] == "ShadowBonnie_Medium")
