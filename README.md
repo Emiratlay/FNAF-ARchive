@@ -55,16 +55,40 @@ You can run the server in two ways:
 
 ## What works
 
-| Works offline | Not implemented yet |
-|---|---|
-| Login, tutorial, inbox | Store purchases |
-| Wild animatronic spawns (by win streak) | Scavenge return and collecting rewards |
-| Winning (parts reward, streak) and losing encounters | Saving workshop changes (equipping CPU/mods/suits) |
-| Sending your endo out scavenging | Repairing, recalling and sending animatronics |
-| Daily challenge (collect parts) | CPU / plush suit / mod drops from encounters |
-| Editor: money, inventory, custom mod chips and skins | Friends, leaderboard (shows only you) |
+Everything below runs offline. 40 of the game's CloudScript calls are emulated:
 
-Calls without logic still get a valid empty answer, so the game keeps running. They show up in `server.log` as `NOT IMPLEMENTED`.
+- **Login, tutorial, inbox:** inbox messages, remnant milestone messages.
+- **Encounters:**
+  - wild spawns by win streak (Basic → Haywire → Insane…);
+  - winning pays parts and the CPU, plush suit and mod **drops** decided at spawn;
+  - losing costs remnant.
+- **Workshop:**
+  - equip CPUs, plush suits, mod chips and remnant;
+  - repair wear and tear;
+  - sell mod chips.
+- **Scavenging:** send out, collect rewards when it returns, recall.
+- **Sending animatronics:** send your endo to yourself; it arrives and attacks with your CPU. Recall and express delivery also work.
+- **Store:**
+  - devices, lures, character packs, endoskeleton slots, Faz-Coins for parts;
+  - prices come from the store list and contents from the game's store data.
+- **Devices:** activating salvage scanners, EMF meters and radio jammers. Lures bring the lured animatronic.
+- **Remnant:** server-side remnant nodes; the colour decides the amount.
+- **Shadow Bonnie:** remnant encounters (Easy → Insane).
+- **Daily challenges:** every challenge type, changing a challenge, collecting the reward.
+- **Profile:** avatar, display name, friend codes.
+- **Editor:** money, inventory, custom mod chips and skins.
+
+How each call was made:
+
+- Calls seen in recordings of the live server are matched field-for-field. Two recording sessions, 798 requests.
+- Calls never recorded (sending, recalling attacks, express delivery, Shadow Bonnie, daily reward collection, device expiry) were rebuilt from the client's own response handlers, so they use only keys the game already understands.
+
+**Not available offline:**
+
+- Friends and other players. The leaderboard shows only you, and sending to a friend comes back to you.
+- Seasonal events and subscriptions.
+
+Any unknown call still gets a valid empty answer, so the game keeps running. It shows up in `server.log` as `NOT IMPLEMENTED`.
 
 ## Requirements
 
@@ -309,6 +333,10 @@ tools/     setup_tools.py (downloads JDK/SDK/adb/signer here)
 3. Register the function in `CLOUDSCRIPT`.
 
 Missing top-level result fields can crash the client; for example, `DeviceAuthenticationResponse` needs `newPlayer`. If a call needs such fields, add a `templates/<FunctionName>.json` with a `resultExtras` object.
+
+### Testing the server
+
+`python server/test_offline.py` plays a full session against `game.py` with a throw-away save and checks every feature: drops, remnant, store, devices, lures, workshop, scavenging, sending, Shadow Bonnie, daily challenges and profile.
 
 ### Custom content
 
