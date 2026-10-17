@@ -153,7 +153,7 @@ def main():
     with open(game.CUSTOM_FILE, "w", encoding="utf-8") as f:
         json.dump({"version": 1, "cpus": [cpu], "attacks": [attack], "loc": []}, f)
     check("custom CPU and attack profile in master data",
-          game.md_version() == 801 and any(c["Logical"] == "Custom_Test_cpu" for c in game.md("CPU_DATA"))
+          game.md_version() == game.BASE_MD_VERSION + 1 and any(c["Logical"] == "Custom_Test_cpu" for c in game.md("CPU_DATA"))
           and any(a["Logical"] == "Custom_Test_cpu" for a in game.md("ATTACK_DATA")))
     check("custom CPU can spawn", "Custom_Test_cpu" in game.spawn_candidates(state()))
     os.remove(game.CUSTOM_FILE)
@@ -196,12 +196,51 @@ def main():
     cs("SEND_ANIMATRONIC_ATTACK_V2", slotId=0, userId="someone")
     check("recall a sent attack", cs("RECALL_ATTACKING_ANIMATRONIC", slotId=0)["WarehouseDataV2"][0]["status"] == "Available")
 
-    # Shadow Bonnie
+    # Friends list holds "you", so the Send Animatronic screen has a target
+    friends = cs("GET_PLAYER_FRIENDS")["friendsList"]
+    check("friends list has yourself", list(friends.values())[0]["userId"] == game.SELF_FRIEND_ID, friends)
+    cs("SEND_ANIMATRONIC_ATTACK_V2", slotId=0, userId=game.SELF_FRIEND_ID)
+    new = cs("REQUEST_ENTITIES_V8", uiLocation="map").get("NewAnimatronicEntities", {})
+    check("sending to the friend entry comes back to you",
+          any(e["originData"]["animatronicOrigin"] == 4 for e in new.values()))
+    cs("RECALL_ATTACKING_ANIMATRONIC", slotId=0)
+
+    # Shadow Bonnie lure: in the store, master data and activation
+    check("Shadow Bonnie lure in master data",
+          any(d.get("DeviceLogical") == game.SB_LURE for d in game.md("DEVICES_DATA"))
+          and any(p.get("PurchasableLogical") == game.SB_LURE for p in game.md("STORE_DATA"))
+          and any(l["ID"] == "device_name_" + game.SB_LURE for l in game.md("LOC_DATA")))
+    items = [i["ItemId"] for st in cs("GET_STORE_ITEMS_V2")["StoreItems"]["Stores"] for i in st["Items"]]
+    check("Shadow Bonnie lure in the store list", game.SB_LURE in items)
+    s = state()
+    s["Currency"]["FAZ_TOKENS"] = 1000
+    game.save_state(s)
+    r = pf("/Client/PurchaseItem", ItemId=game.SB_LURE, VirtualCurrency="FC", Price=game.SB_LURE_PRICE)
+    check("buy Shadow Bonnie lure", r.get("code") == 200 and state()["PlayerDeviceData"]["purchased"].get(game.SB_LURE) == 3,
+          r.get("errorMessage"))
+    cs("ACTIVATE_DEVICE", deviceConfigId=game.SB_LURE)
+    s = state()
+    for i in s["Incoming"]:
+        i["at"] = 0
+    game.save_state(s)
+    new = cs("REQUEST_ENTITIES_V8", uiLocation="map").get("NewAnimatronicEntities", {})
+    sbs = [e for e in new.values() if e["animatronicConfigId"].startswith("ShadowBonnie")]
+    check("lure brings Shadow Bonnie (Easy)", sbs and sbs[0]["animatronicConfigId"] == "ShadowBonnie_Easy"
+          and sbs[0]["originData"]["animatronicOrigin"] == 2, [e["animatronicConfigId"] for e in new.values()])
+    cs("AWARD_ENTITY_REWARDS_V2", entityId=sbs[0]["entityId"])
+    cs("ACTIVATE_DEVICE", deviceConfigId=game.SB_LURE)
+    s = state()
+    nxt = [i["entity"]["animatronicConfigId"] for i in s["Incoming"]]
+    check("next lure is harder (Medium)", "ShadowBonnie_Medium" in nxt, nxt)
+    s["Incoming"] = []
+    game.save_state(s)
+
+    # Shadow Bonnie (remnant threat path)
     sb = list(cs("START_ESSENCE_ENCOUNTER_V3")["NewAnimatronicEntities"].values())[0]
-    check("Shadow Bonnie encounter", sb["animatronicConfigId"] == "ShadowBonnie_Easy")
+    check("Shadow Bonnie encounter (Medium after one Easy win)", sb["animatronicConfigId"] == "ShadowBonnie_Medium")
     cs("AWARD_ENTITY_REWARDS_V2", entityId=sb["entityId"])
-    check("Shadow Bonnie defeat counted",
-          state()["PlayerStatsData"]["plushSuitDefeatDataList"]["ShadowBonnie"]["ShadowBonnie_Easy"] == 1)
+    check("Shadow Bonnie defeats counted",
+          state()["PlayerStatsData"]["plushSuitDefeatDataList"]["ShadowBonnie"]["ShadowBonnie_Medium"] == 1)
 
     # Daily challenges
     dc = cs("REQUEST_ROLLOVER_DATA")["PlayerDailyChallengeData"]

@@ -67,7 +67,7 @@ Everything below runs offline. 40 of the game's CloudScript calls are emulated:
   - repair wear and tear;
   - sell mod chips.
 - **Scavenging:** send out, collect rewards when it returns, recall.
-- **Sending animatronics:** send your endo to yourself; it arrives and attacks with your CPU. Recall works too.
+- **Sending animatronics:** the friends list contains **"Me (offline)"**. Send your endo to it and it comes back to attack you with your CPU. Recall works too.
 - **Express delivery:** pay 50 Faz-Coins to bring an animatronic on the map to you now.
 - **Store:**
   - devices, lures, character packs, endoskeleton slots, Faz-Coins for parts;
@@ -78,7 +78,11 @@ Everything below runs offline. 40 of the game's CloudScript calls are emulated:
   - lures bring the lured animatronic;
   - timed devices such as the Radio Jammer expire on schedule.
 - **Remnant:** server-side remnant nodes; the colour decides the amount.
-- **Shadow Bonnie:** remnant encounters (Easy → Insane).
+- **Shadow Bonnie:**
+  - The **Shadow Bonnie Lure** is sold in the store (500 Faz-Coins for 3) and can be added in the editor.
+  - Activating it brings Shadow Bonnie in about 10 seconds.
+  - Every win raises the difficulty: Easy → Medium → Hard → Insane.
+  - The game's own remnant-threat trigger also works, but is rare.
 - **Daily challenges:** every challenge type, changing a challenge, collecting the reward.
 - **Profile:** avatar, display name, friend codes.
 - **Editor:** money, inventory, CPUs, custom mod chips, skins and CPUs.
@@ -267,7 +271,7 @@ If you created new mod chips or skins, the game downloads updated game data at s
 
 | Tab | What it does |
 |---|---|
-| **Money** | Set Parts, Faz-Coins and Remnant. Quick +100 / +1000 / +10000 buttons. |
+| **Money** | Set Parts, Faz-Coins and Remnant. Quick +100 / +1000 / +10000 buttons. Below them, **Devices**: add or remove lures (including the Shadow Bonnie Lure), EMF Meters, Salvage Scanners and the rest. |
 | **Mod Chips** | Every mod chip in the game; **+ / −** changes how many you own. **+ Create a new mod chip** lets you design one (see below). |
 | **Skins** | Switch on the skins you want to own. **+ Create a new skin** lets you create one (see below). |
 | **CPUs** | Every CPU a player can equip (Freddy, Toy Bonnie, Springtrap…); **+ / −** changes how many you own. **+ Create a new CPU** lets you design one (see below). |
@@ -355,6 +359,8 @@ tools/     setup_tools.py (downloads JDK/SDK/adb/signer here)
 Missing top-level result fields can crash the client; for example, `DeviceAuthenticationResponse` needs `newPlayer`. If a call needs such fields, add a `templates/<FunctionName>.json` with a `resultExtras` object.
 
 ### Testing the server
+
+`python server/test_kayitlar.py <captures folder>` replays your own recordings and checks every response key.
 
 `python server/test_offline.py` plays a full session against `game.py` with a throw-away save and checks every feature: drops, remnant, store, devices, lures, workshop, scavenging, sending, Shadow Bonnie, daily challenges and profile.
 

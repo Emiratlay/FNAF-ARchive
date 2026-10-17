@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.2
+
+### Server
+- **Send to yourself.** The game's Send screen needs a friend as the target, and offline the friends list was empty, so sending never showed up. The friends list now contains **"Me (offline)"**. Anything sent to it comes back to attack you.
+- **Shadow Bonnie Lure:**
+  - The game only starts Shadow Bonnie from its own remnant-threat check (`ThreatEvaluator.CheckForThreatSpawn`), which rarely fires. The new built-in lure device calls it on demand.
+  - It is in the store (500 Faz-Coins for 3) and brings Shadow Bonnie in about 10 seconds.
+  - Difficulty rises with each win: Easy → Medium → Hard → Insane.
+- Built-in additions (the Shadow Bonnie Lure device, store item and texts) are served as master data. The served version moved to 2000+, so phones re-download it once.
+- `test_kayitlar.py` replays the recordings: 798 requests, 0 differences.
+
+### Editor
+- **Devices** section under Money: add or remove any lure (including the Shadow Bonnie Lure) or device.
+- Fixed device counts not being saved after a previous save in the same session.
+
+### Tools
+- Ghidra 12.1.4 can be connected to REA for decompiling `libil2cpp.so`. This is optional; see `tools/il2dis.py` for the lightweight path.
+
 ## v1.1
 
 ### Editor app

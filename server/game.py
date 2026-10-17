@@ -23,7 +23,9 @@ STATE_FILE = os.path.join(HERE, "save", "state.json")
 MASTERDATA = os.path.join(HERE, "cdn", "8.0.0", "Masterdata", "800")
 # Custom content created by the editor app (mod chips, skins, texts).
 CUSTOM_FILE = os.path.join(HERE, "custom", "custom.json")
-BASE_MD_VERSION = 800
+# Served master data version. Raised above the stock 800 so phones that cached the stock data
+# re-download it with the built-in additions below.
+BASE_MD_VERSION = 2000
 # custom.json section -> master data file it is appended to
 CUSTOM_SECTIONS = {"mods": "MODS_DATA", "plushsuits": "PLUSHSUIT_DATA", "cpus": "CPU_DATA",
                    "attacks": "ATTACK_DATA", "loc": "LOC_DATA"}
@@ -57,11 +59,57 @@ def md_version():
     return BASE_MD_VERSION + int(custom().get("version", 0) or 0)
 
 
+def _stock(name):
+    with open(os.path.join(MASTERDATA, name), encoding="utf-8") as f:
+        return json.load(f)["Entries"]
+
+
+def _loc(key, text):
+    e = {"ID": key}
+    for lang in ("English", "French", "Italian", "German", "Spanish_Spain", "Portuguese_Brazil", "Russian"):
+        e[lang] = text
+    return e
+
+
+def builtin(name, stock):
+    """Offline-only additions that ship with the server (not user content): the Shadow Bonnie
+    lure. Built from stock entries so they only use fields the game's parser knows."""
+    if name == "DEVICES_DATA":
+        base = next((d for d in stock if d.get("DeviceLogical") == "Lure_Bonnie"), None)
+        if base:
+            d = copy.deepcopy(base)
+            d.update({"DeviceLogical": SB_LURE, "DeviceName": "device_name_" + SB_LURE,
+                      "ConcreteItemID": "Device_" + SB_LURE, "Description": "device_desc_" + SB_LURE, "Order": 1035})
+            d["Effects"]["Lure"]["AnimatronicLured"] = "ShadowBonnie"
+            return [d]
+    if name == "STORE_DATA":
+        base = next((p for p in stock if p.get("PurchasableLogical") == "Lure_Bonnie"), None)
+        if base:
+            p = copy.deepcopy(base)
+            p.update({"PurchasableLogical": SB_LURE, "PurchasableName": "store_purchasable_" + SB_LURE,
+                      "PurchasableNameRef": "Shadow Bonnie Lure", "Description": "store_description_purchasable_" + SB_LURE,
+                      "DescriptionRef": SB_LURE_DESC, "Order": 3010, "Cost": {"HardCurrency": SB_LURE_PRICE}})
+            p["Contents"] = {"Item1": {"Logical": SB_LURE, "Type": "Device", "Qty": 3}}
+            return [p]
+    if name == "LOC_DATA":
+        return [_loc("device_name_" + SB_LURE, "Shadow Bonnie Lure"),
+                _loc("device_desc_" + SB_LURE, SB_LURE_DESC),
+                _loc("store_purchasable_" + SB_LURE, "Shadow Bonnie Lure"),
+                _loc("store_description_purchasable_" + SB_LURE, SB_LURE_DESC)]
+    return []
+
+
+SB_LURE = "Lure_ShadowBonnie"
+SB_LURE_PRICE = 500
+SB_LURE_DESC = "Activating the lure calls Shadow Bonnie to you. Each win makes the next one harder."
+SELF_FRIEND_ID = "0FF11E5E1F000000"
+
+
 def md(name):
     ver = md_version()
     if _md.get(name, (None,))[0] != ver:
-        with open(os.path.join(MASTERDATA, name), encoding="utf-8") as f:
-            entries = json.load(f)["Entries"]
+        entries = _stock(name)
+        entries = entries + builtin(name, entries)
         c = custom()
         for section, file_name in CUSTOM_SECTIONS.items():
             if file_name == name:
@@ -809,10 +857,14 @@ def cs_express_delivery(s, p):
 ESSENCE_TIERS = ["ShadowBonnie_Easy", "ShadowBonnie_Medium", "ShadowBonnie_Hard", "ShadowBonnie_Insane"]
 
 
-def cs_start_essence_encounter(s, p):
+def shadow_bonnie_tier(s):
+    """Easy until beaten once, then Medium, Hard and finally Insane."""
     defeats = s["PlayerStatsData"]["plushSuitDefeatDataList"].setdefault("ShadowBonnie", {})
-    tier = next((t for t in ESSENCE_TIERS if not defeats.get(t)), ESSENCE_TIERS[-1])
-    e = make_entity(s, tier, origin=2, plush="ShadowBonnie")
+    return next((t for t in ESSENCE_TIERS if not defeats.get(t)), ESSENCE_TIERS[-1])
+
+
+def cs_start_essence_encounter(s, p):
+    e = make_entity(s, shadow_bonnie_tier(s), origin=2, plush="ShadowBonnie")
     s["Entities"][e["entityId"]] = e
     return {"NewAnimatronicEntities": {e["entityId"]: e}}
 
@@ -914,8 +966,12 @@ def cs_activate_device(s, p):
         effects = d.get("Effects") or {}
         if effects.get("Type") == "Lure":
             lured = (effects.get("Lure") or {}).get("AnimatronicLured") or "FreddyFazbear"
-            cpu = lured if lured in md_by_logical("CPU_DATA") else "FreddyFazbear"
-            e = make_entity(s, cpu, origin=1, plush=lured)
+            if lured == "ShadowBonnie":
+                # Phantom encounter: same entity the remnant threat would start, just on demand.
+                e = make_entity(s, shadow_bonnie_tier(s), origin=2, plush="ShadowBonnie")
+            else:
+                cpu = lured if lured in md_by_logical("CPU_DATA") else "FreddyFazbear"
+                e = make_entity(s, cpu, origin=1, plush=lured)
             s["Incoming"].append({"at": time.time() + rand_range(effects.get("Lure"), 10), "entity": e})
         elif exp:
             did = str(now_ms())
@@ -963,9 +1019,22 @@ def cs_expire_device(s, p):
     return {"PlayerDeviceData": s["PlayerDeviceData"]}
 
 
+def store_items():
+    """The store list the game shows: the recorded ARchive store plus the built-in items."""
+    sd = template("GET_STORE_ITEMS_V2")
+    stores = (sd.get("StoreItems") or {}).get("Stores") or []
+    if stores:
+        ids = {i["ItemId"] for i in stores[0].get("Items", [])}
+        for p in builtin("STORE_DATA", _stock("STORE_DATA")):
+            if p["PurchasableLogical"] not in ids:
+                stores[0]["Items"].append({"ItemId": p["PurchasableLogical"],
+                                           "VirtualCurrencyPrices": {"FC": p["Cost"]["HardCurrency"]}})
+    return sd
+
+
 def store_prices():
     prices = {}
-    for store in (template("GET_STORE_ITEMS_V2").get("StoreItems") or {}).get("Stores", []):
+    for store in (store_items().get("StoreItems") or {}).get("Stores", []):
         for item in store.get("Items", []):
             prices[item["ItemId"]] = item.get("VirtualCurrencyPrices") or {}
     return prices
@@ -1091,6 +1160,16 @@ def cs_lookup_friend_code(s, p):
     return {"lookupFriendCodeResponse": "userTriedToFriendSelf" if code == s["friendCode"] else "groupNotFound"}
 
 
+def cs_friends(s, p):
+    """Offline there are no other players, so the friends list holds one entry: you. It gives the
+    Send Animatronic screen a target; SEND_ANIMATRONIC_ATTACK_V2 sends everything back to you."""
+    return {"friendsList": {SELF_FRIEND_ID: {"userId": SELF_FRIEND_ID, "displayName": SELF_FRIEND_NAME,
+                                             "avatarId": s.get("AvatarId", "default")}}}
+
+
+SELF_FRIEND_NAME = "Me (offline)"
+
+
 def cs_configs(s, p):
     sd = template("GET_ALL_CONFIGS_V7")
     sd["MasterDataVersion"] = md_version()
@@ -1110,10 +1189,12 @@ CLOUDSCRIPT = {
     "AuthenticationResponse": lambda s, p: cs_auth(s, p, "AuthenticationResponse"),
     "AUTHENTICATE_GETSOCIAL": cs_template("AUTHENTICATE_GETSOCIAL"),
     "GET_ALL_CONFIGS_V7": cs_configs,
-    "GET_STORE_ITEMS_V2": cs_template("GET_STORE_ITEMS_V2"),
+    "GET_STORE_ITEMS_V2": lambda s, p: store_items(),
     "GET_PLAYER_DATA": cs_get_player_data,
     "GET_OWNED_GOODS": cs_get_owned_goods,
-    "GET_PLAYER_FRIENDS": lambda s, p: {"friendsList": {}},
+    "GET_PLAYER_FRIENDS": cs_friends,
+    "UPDATE_PLAYER_FRIENDS": cs_friends,
+    "REMOVE_FRIEND": cs_friends,
     "GET_ENTITY_DATA_V3": cs_get_entity_data,
     "GET_WAREHOUSE_DATA_V2": cs_warehouse,
     "GET_CPU_INVENTORY": lambda s, p: {"CPUInventory": s["CPUInventory"]},

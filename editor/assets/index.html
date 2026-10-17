@@ -118,7 +118,7 @@ function effName(t) { return EFFECT_TR[t] || t; }
 // ------------------------------------------------------------------ data
 var D = {};   // base: mods, cats, suits, loc
 var state = null, custom = null;
-var dirtyState = false, dirtyCustom = false, dirtyWorld = false;
+var dirtyState = false, dirtyCustom = false, dirtyWorld = false, dirtyDevices = false;
 
 function emptyCustom() { return { version: 0, mods: [], plushsuits: [], cpus: [], attacks: [], loc: [], meta: {} }; }
 
@@ -142,6 +142,10 @@ function load() {
   var cpus = readJson(MD + "CPU_DATA"), attacks = readJson(MD + "ATTACK_DATA");
   if (!cpus || !attacks) { fail("Could not read game data (CPU_DATA / ATTACK_DATA)."); return false; }
   D.cpus = cpus.Entries; D.attacks = attacks.Entries;
+  var devices = readJson(MD + "DEVICES_DATA");
+  D.devices = (devices ? devices.Entries : []).filter(function (d) { return d.DeviceLogical.indexOf("Endoskeleton_") !== 0; });
+  // Device added by the server itself (not in the master data files).
+  D.devices.push({ DeviceLogical: "Lure_ShadowBonnie", DeviceName: "", Effects: { Type: "Lure" }, _name: "Shadow Bonnie Lure" });
   D.loc = {};
   loc.Entries.forEach(function (e) { D.loc[e.ID] = e.English; });
 
@@ -161,6 +165,8 @@ function load() {
   if (!state.ModInventory) state.ModInventory = {};
   if (!state.Inventory) state.Inventory = {};
   if (!state.CPUInventory) state.CPUInventory = { BareEndo: 1 };
+  if (!state.PlayerDeviceData) state.PlayerDeviceData = { active: {}, pending: [], purchased: {} };
+  if (!state.PlayerDeviceData.purchased) state.PlayerDeviceData.purchased = {};
 
   document.getElementById("status").textContent =
     "Save: " + Android.basePath() + " · custom content version " + custom.version;
@@ -198,6 +204,7 @@ function toast(msg, kind) {
   clearTimeout(toast._t); toast._t = setTimeout(function () { t.className = "toast"; }, 2600);
 }
 function markDirty(which) {
+  if (which === "devices") { dirtyDevices = true; return; }
   if (which === "custom") dirtyCustom = true; else dirtyState = true;
   document.getElementById("savebar").className = "savebar show";
 }
@@ -236,6 +243,28 @@ function renderMoney(root) {
     box.appendChild(el("div", { class: "card money" }, [el("label", { text: f[1] }), input, quick]));
   });
   root.appendChild(box);
+  // Devices: lures (incl. Shadow Bonnie), EMF Meter, Salvage Scanner...
+  root.appendChild(el("h2", { text: "Devices" }));
+  root.appendChild(el("div", { class: "hint", text: "Using a lure in the game brings that character in ~10 seconds. The Shadow Bonnie Lure gets harder after every win." }));
+  // After a save, state is a new object: always read the current one.
+  var owned = function () { return state.PlayerDeviceData.purchased; };
+  D.devices.forEach(function (d) {
+    var id = d.DeviceLogical;
+    var count = el("span", { text: String(owned()[id] || 0) });
+    function set(n) { owned()[id] = Math.max(0, n); count.textContent = String(owned()[id]); markDirty("state"); markDirty("devices"); }
+    root.appendChild(el("div", { class: "card row" }, [
+      el("div", { class: "grow" }, [
+        el("div", { class: "name", text: d._name || locText(d.DeviceName, id) }),
+        el("div", { class: "sub", text: (d.Effects || {}).Type === "Lure" ? "Lure" : "Device" })
+      ]),
+      el("div", { class: "stepper" }, [
+        el("button", { text: "−", onclick: function () { set((owned()[id] || 0) - 1); } }),
+        count,
+        el("button", { text: "+", onclick: function () { set((owned()[id] || 0) + 1); } })
+      ])
+    ]));
+  });
+
 }
 
 // ------------------------------------------------------------------ Mod chips
@@ -681,10 +710,15 @@ function save() {
       var keys = ["Currency", "ModInventory", "Inventory", "CPUInventory"];
       if (dirtyWorld) keys.push("Warehouse", "Entities");
       keys.forEach(function (k) { fresh[k] = state[k]; });
+      // Only write device counts; the server manages active devices.
+      if (dirtyDevices) {
+        if (!fresh.PlayerDeviceData) fresh.PlayerDeviceData = { active: {}, pending: [], purchased: {} };
+        fresh.PlayerDeviceData.purchased = state.PlayerDeviceData.purchased;
+      }
       writeJson(STATE, fresh);
       state = fresh;
     }
-    dirtyState = dirtyCustom = dirtyWorld = false;
+    dirtyState = dirtyCustom = dirtyWorld = dirtyDevices = false;
     document.getElementById("savebar").className = "savebar";
     document.getElementById("status").textContent = "Save: " + Android.basePath() + " · custom content version " + custom.version;
     toast("Saved. Reopen the game to see it.", "ok");

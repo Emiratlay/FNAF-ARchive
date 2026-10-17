@@ -19,6 +19,13 @@
     check("parts saved", st.Currency.PARTS === 5000, JSON.stringify(st.Currency));
     check("faz-coins +1000", st.Currency.FAZ_TOKENS >= 1000, JSON.stringify(st.Currency));
 
+    // 1b) Devices: add the Shadow Bonnie Lure
+    var sbCard = $all("#main .card").filter(function (c) { return c.textContent.indexOf("Shadow Bonnie Lure") === 0; })[0];
+    sbCard.querySelectorAll(".stepper button")[1].click(); sbCard.querySelectorAll(".stepper button")[1].click();
+    $("#saveBtn").click();
+    st = disk("save/state.json");
+    check("Shadow Bonnie Lure added", st.PlayerDeviceData.purchased.Lure_ShadowBonnie === 2, JSON.stringify(st.PlayerDeviceData.purchased));
+
     // 2) Add an existing mod chip
     show("mods");
     var firstPlus = $all("#main .stepper button")[1];
